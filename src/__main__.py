@@ -1,5 +1,6 @@
 import os
 import asyncio
+import logging
 
 from aiogram import Dispatcher, Bot
 
@@ -18,6 +19,7 @@ def create_dispatcher() -> Dispatcher:
 async def main():
     bot = Bot(token=os.getenv('TOKEN'))
     dispatcher = create_dispatcher()
+    logging.basicConfig(level=logging.INFO)
 
     await dispatcher.start_polling(
         bot
