@@ -3,13 +3,15 @@ import asyncio
 import logging
 
 from aiogram import Dispatcher, Bot
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.modules import modules
 from src.menu import MENU
 
 
 def create_dispatcher() -> Dispatcher:
-    dispatcher = Dispatcher()
+    storage = MemoryStorage()
+    dispatcher = Dispatcher(storage=storage)
     dispatcher.include_router(MENU.router)
 
     for module in modules:
