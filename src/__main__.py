@@ -4,14 +4,16 @@ import logging
 
 from aiogram import Dispatcher, Bot
 
-from src.modules import routers
+from src.modules import modules
+from src.menu import MENU
 
 
 def create_dispatcher() -> Dispatcher:
     dispatcher = Dispatcher()
+    dispatcher.include_router(MENU.router)
 
-    for router in routers:
-        dispatcher.include_router(router)
+    for module in modules:
+        dispatcher.include_router(module.router)
 
     return dispatcher
 

@@ -1,3 +1,3 @@
-from .start import start_router
+from .vpc import VPC
 
-routers = (start_router,)
+modules = (VPC,)
