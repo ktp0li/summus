@@ -147,7 +147,7 @@ async def eps_create_name(message: types.Message, state: FSMContext):
     await state.set_state(eps_CreateStates.DESCRIPTION)
 
 @EPS.router.message(eps_CreateStates.DESCRIPTION)
-async def eps_create_projid(message: types.Message, state: FSMContext):
+async def eps_create_desc(message: types.Message, state: FSMContext):
     description = message.text
 
     data = await state.get_data()
@@ -180,10 +180,69 @@ async def eps_list(call: CallbackQuery, state: FSMContext):
     for i in result.enterprise_projects:
         entry += [f'<b>{i.name}</b>\n' + \
                     f'\t id: <code>{i.id}</code>\n' + \
-                    f'\t description: {i.description}\n']
+                    f'\t description: {i.description}\n'
+                    f'\t status: {"enabled" if i.status == 1 else "disabled"}\n']
 
     await call.message.answer('\n'.join(entry), parse_mode='html')
     await call.answer()
+
+
+class eps_ProjectStates(StatesGroup):
+    ENABLE = State()
+    DISABLE = State()
+
+@EPS.router.callback_query(eps_AuthStates.AUTHORIZED, EpsCallback.filter(F.action == Action.DISABLE))
+async def eps_disable_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи айди выключаемого проекта')
+    await state.set_state(eps_ProjectStates.DISABLE)
+    await call.answer()
+
+@EPS.router.message(eps_ProjectStates.DISABLE)
+async def eps_disable(message: types.Message, state: FSMContext):
+    proj_id = message.text
+
+    data = await state.get_data()
+    client = data['client']
+
+    try:
+        request = DisableEnterpriseProjectRequest(proj_id)
+        request.body = DisableAction('disable')
+        response = client.disable_enterprise_project_async(request)
+        result = response.result()
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(eps_AuthStates.AUTHORIZED)
+        return
+
+    await message.answer('Выключено!')
+    await state.set_state(eps_AuthStates.AUTHORIZED)
+
+
+@EPS.router.callback_query(eps_AuthStates.AUTHORIZED, EpsCallback.filter(F.action == Action.ENABLE))
+async def eps_enable_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи айди включаемого проекта')
+    await state.set_state(eps_ProjectStates.ENABLE)
+    await call.answer()
+
+@EPS.router.message(eps_ProjectStates.ENABLE)
+async def eps_enable(message: types.Message, state: FSMContext):
+    proj_id = message.text
+
+    data = await state.get_data()
+    client = data['client']
+
+    try:
+        request = EnableEnterpriseProjectRequest(proj_id)
+        request.body = DisableAction('enable')
+        response = client.enable_enterprise_project_async(request)
+        result = response.result()
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(eps_AuthStates.AUTHORIZED)
+        return
+
+    await message.answer('Включено!')
+    await state.set_state(eps_AuthStates.AUTHORIZED)
 
 
 @EPS.router.callback_query(EpsCallback.filter(F.action.in_(list(Action))))
