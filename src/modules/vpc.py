@@ -60,7 +60,7 @@ def keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-class AuthStates(StatesGroup):
+class vpc_AuthStates(StatesGroup):
     PROJECT_ID = State()
     AK = State()
     SK = State()
@@ -75,33 +75,33 @@ async def vpc_main(call: CallbackQuery):
 
 @VPC.router.callback_query(VpcCallback.filter(F.action == Action.AUTH))
 async def vpc_auth(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введите project ID')
-    await state.set_state(AuthStates.PROJECT_ID)
+    await call.message.answer('Введи project ID')
+    await state.set_state(vpc_AuthStates.PROJECT_ID)
     await call.answer()
 
 
-@VPC.router.message(AuthStates.PROJECT_ID)
+@VPC.router.message(vpc_AuthStates.PROJECT_ID)
 async def vpc_auth_pjid(message: types.Message, state: FSMContext):
     project_id = message.text
 
     await state.update_data(project_id=project_id)
-    await message.answer('Введите AK')
-    await state.set_state(AuthStates.AK)
+    await message.answer('Введи AK')
+    await state.set_state(vpc_AuthStates.AK)
 
 
-@VPC.router.message(AuthStates.AK)
+@VPC.router.message(vpc_AuthStates.AK)
 async def vpc_auth_ak(message: types.Message, state: FSMContext):
     ak = message.text
     await state.update_data(ak=ak)
-    await message.answer('Введите SK')
-    await state.set_state(AuthStates.SK)
+    await message.answer('Введит SK')
+    await state.set_state(vpc_AuthStates.SK)
 
 
-@VPC.router.message(AuthStates.SK)
+@VPC.router.message(vpc_AuthStates.SK)
 async def vpc_auth_sk(message: types.Message, state: FSMContext):
     sk = message.text
     await state.update_data(sk=sk)
-    await message.answer('батя грит малаца. Ща проверим твои креды')
+    await message.answer('Батя грит малаца. Ща проверим твои креды')
 
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = False
@@ -121,7 +121,7 @@ async def vpc_auth_sk(message: types.Message, state: FSMContext):
     await state.update_data(client=client)
 
     try:
-        client.list_vpcs_async(ListVpcsRequest(limit=1))
+        client.list_vpcs_async(ListVpcsRequest(limit=1)).result()
     except exceptions.ClientRequestException as e:  # pylint: disable=C0103
         print(e)
         await message.answer('Неверные креды, бро. Попробуй ещё раз', reply_markup=keyboard())
@@ -129,7 +129,7 @@ async def vpc_auth_sk(message: types.Message, state: FSMContext):
         return
 
     await message.answer('Всё нормально. Я проверил. Что делаем дальше?', reply_markup=keyboard())
-    await state.set_state(AuthStates.AUTHORIZED)
+    await state.set_state(vpc_AuthStates.AUTHORIZED)
 
 
 @VPC.router.callback_query(VpcCallback.filter(F.action == Action.UNAUTH))
@@ -139,48 +139,48 @@ async def vpc_unauth(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-class CreateStates(StatesGroup):
+class vpc_CreateStates(StatesGroup):
     NAME = State()
     DESCRIPTION = State()
     CIDR = State()
     ENTERPRISE_PROJECT_ID = State()
 
 
-@VPC.router.callback_query(AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.CREATE))
+@VPC.router.callback_query(vpc_AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.CREATE))
 async def vpc_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового vpc')
-    await state.set_state(CreateStates.NAME)
+    await state.set_state(vpc_CreateStates.NAME)
     await call.answer()
 
 
-@VPC.router.message(CreateStates.NAME)
+@VPC.router.message(vpc_CreateStates.NAME)
 async def vpc_create_name(message: types.Message, state: FSMContext):
     name = message.text
 
     await message.answer('Введи описание')
     await state.update_data(name=name)
-    await state.set_state(CreateStates.DESCRIPTION)
+    await state.set_state(vpc_CreateStates.DESCRIPTION)
 
 
-@VPC.router.message(CreateStates.DESCRIPTION)
+@VPC.router.message(vpc_CreateStates.DESCRIPTION)
 async def vpc_create_description(message: types.Message, state: FSMContext):
     description = message.text
 
     await state.update_data(description=description)
     await message.answer('введи CIDR')
-    await state.set_state(CreateStates.CIDR)
+    await state.set_state(vpc_CreateStates.CIDR)
 
 
-@VPC.router.message(CreateStates.CIDR)
+@VPC.router.message(vpc_CreateStates.CIDR)
 async def vpc_create_cidr(message: types.Message, state: FSMContext):
     cidr = message.text
     await state.update_data(cidr=cidr)
 
     await message.answer('введи Enterprise project id (или 0)')
-    await state.set_state(CreateStates.ENTERPRISE_PROJECT_ID)
+    await state.set_state(vpc_CreateStates.ENTERPRISE_PROJECT_ID)
 
 
-@VPC.router.message(CreateStates.ENTERPRISE_PROJECT_ID)
+@VPC.router.message(vpc_CreateStates.ENTERPRISE_PROJECT_ID)
 async def vpc_create_projid(message: types.Message, state: FSMContext):
     enterprise_project_id = message.text
 
@@ -203,17 +203,17 @@ async def vpc_create_projid(message: types.Message, state: FSMContext):
         if result.vpc is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(AuthStates.AUTHORIZED)
+            await state.set_state(vpc_AuthStates.AUTHORIZED)
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
-        await state.set_state(AuthStates.AUTHORIZED)
+        await state.set_state(vpc_AuthStates.AUTHORIZED)
         return
 
     await message.answer('Создано!')
-    await state.set_state(AuthStates.AUTHORIZED)
+    await state.set_state(vpc_AuthStates.AUTHORIZED)
 
 
-@VPC.router.callback_query(AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.LIST))
+@VPC.router.callback_query(vpc_AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.LIST))
 async def vpc_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
@@ -235,18 +235,18 @@ async def vpc_list(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-class DeleteStates(StatesGroup):
+class vpc_DeleteStates(StatesGroup):
     ID = State()
 
 
-@VPC.router.callback_query(AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.DELETE))
+@VPC.router.callback_query(vpc_AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.DELETE))
 async def vpc_delete_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id вэпэцэшки')
-    await state.set_state(DeleteStates.ID)
+    await state.set_state(vpc_DeleteStates.ID)
     await call.answer()
 
 
-@VPC.router.message(DeleteStates.ID)
+@VPC.router.message(vpc_DeleteStates.ID)
 async def vpc_delete(message: types.Message, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
@@ -261,25 +261,25 @@ async def vpc_delete(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(AuthStates.AUTHORIZED)
+        await state.set_state(vpc_AuthStates.AUTHORIZED)
         return
 
     await message.answer('это база')
-    await state.set_state(AuthStates.AUTHORIZED)
+    await state.set_state(vpc_AuthStates.AUTHORIZED)
 
 
-class ShowStates(StatesGroup):
+class vpc_ShowStates(StatesGroup):
     ID = State()
 
 
-@VPC.router.callback_query(AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.SHOW))
+@VPC.router.callback_query(vpc_AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.SHOW))
 async def vpc_show_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id вэпэцэшки')
-    await state.set_state(ShowStates.ID)
+    await state.set_state(vpc_ShowStates.ID)
     await call.answer()
 
 
-@VPC.router.message(ShowStates.ID)
+@VPC.router.message(vpc_ShowStates.ID)
 async def vpc_show(message: types.Message, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
@@ -295,7 +295,7 @@ async def vpc_show(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(AuthStates.AUTHORIZED)
+        await state.set_state(vpc_AuthStates.AUTHORIZED)
         return
 
     await state.clear()
