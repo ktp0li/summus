@@ -2,7 +2,8 @@ from huaweicloudsdkcore.auth.credentials import BasicCredentials, GlobalCredenti
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
 
-from huaweicloudsdkeps.v1 import EpsAsyncClient, ListEnterpriseProjectRequest, CreateEnterpriseProjectRequest, EnterpriseProject, EnableEnterpriseProjectRequest, EnableAction, DisableAction, DisableEnterpriseProjectRequest
+from huaweicloudsdkeps.v1 import EpsAsyncClient, ListEnterpriseProjectRequest, CreateEnterpriseProjectRequest, EnterpriseProject,\
+    EnableEnterpriseProjectRequest, EnableAction, DisableAction, DisableEnterpriseProjectRequest, UpdateEnterpriseProjectRequest
 def handle(e):
     print(e.status_code)
     print(e.request_id)
@@ -18,19 +19,19 @@ def list_enterprise_project(client):
     except exceptions.ClientRequestException as exc:
         handle(exc)
 
-def create_enterprise_project(client):
+def create_enterprise_project(client, name, desc, proj_type):
     try:
         request = CreateEnterpriseProjectRequest()
-        request.body = EnterpriseProject('puk11', 'kak')
+        request.body = EnterpriseProject(name, desc, proj_type)
         response = client.create_enterprise_project_async(request)
         result = response.result()
         print(result)
     except exceptions.ClientRequestException as exc:
         handle(exc)
 
-def enable_enterprise_project(client):
+def enable_enterprise_project(client, project_id):
     try:
-        request = EnableEnterpriseProjectRequest(enterprise_project_id="6fe88c4f-be76-4c61-ae3d-a6ff15d4bf5a")
+        request = EnableEnterpriseProjectRequest(enterprise_project_id=project_id)
         request.body = EnableAction('enable')
         response = client.enable_enterprise_project_async(request)
         result = response.result()
@@ -38,9 +39,9 @@ def enable_enterprise_project(client):
     except exceptions.ClientRequestException as exc:
         handle(exc)
 
-def disable_enterprise_project(client):
+def disable_enterprise_project(client, project_id):
     try:
-        request = DisableEnterpriseProjectRequest(enterprise_project_id="6fe88c4f-be76-4c61-ae3d-a6ff15d4bf5a")
+        request = DisableEnterpriseProjectRequest(enterprise_project_id=project_id)
         request.body = DisableAction('disable')
         response = client.disable_enterprise_project_async(request)
         result = response.result()
@@ -48,13 +49,21 @@ def disable_enterprise_project(client):
     except exceptions.ClientRequestException as exc:
         handle(exc)
 
+def update_enterprise_project(client, project_id, name, desc, proj_type):
+    try:
+        request = UpdateEnterpriseProjectRequest(enterprise_project_id=project_id)
+        request.body = EnterpriseProject(name, desc, proj_type)
+        response = client.update_enterprise_project_async(request)
+        print(response)
+    except exceptions.ClientRequestException as exc:
+        handle(exc)
 
 if __name__ == "__main__":
-    ak = "E7LTLBACONTPGAZ1QSCF"
-    sk = "UJDZN8EMV82p9oEk98m6bdhOdpmE5iaN3W7mNK5P"
-    #project_id = "b4df643b9d8e44a58b64605519482245"
-    account_id = '1e8824275f4946b0a1d26591ab3f8f03'
-    endpoint = "https://eps.ru-moscow-1.hc.sbercloud.ru"
+    ak = ''
+    sk = ''
+    account_id = ''
+    endpoint = 'https://eps.ru-moscow-1.hc.sbercloud.ru'
+    enterprise_project_id = ''
 
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = False
@@ -67,4 +76,3 @@ if __name__ == "__main__":
     .build()
 
     list_enterprise_project(eps_client)
-    enable_enterprise_project(eps_client)
