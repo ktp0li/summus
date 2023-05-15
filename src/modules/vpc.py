@@ -129,6 +129,21 @@ async def vpc_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('VPC CREATE')
     print(await state.get_data())
     await call.answer()
+
+
+@VPC.router.callback_query(States.AUTHORIZED, VpcCallback.filter(F.action == Action.LIST))
+async def vpc_list(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    request = ListVpcsRequest()
+    response = client.list_vpcs_async(request)
+    result = response.result() # type: ListVpcsResponse
+
+    await call.message.answer(str(result))
+    await call.answer()
+
+
 @VPC.router.callback_query(VpcCallback.filter(F.action.in_(list(Action))))
 async def vpc_not_authorized(call: CallbackQuery):
     await call.message.edit_text('Бро сначала тебе нужно авторизоваться. ' +
