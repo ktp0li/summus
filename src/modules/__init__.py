@@ -1,3 +1,4 @@
 from .vpc import VPC
+from .eps import EPS
 
-modules = (VPC,)
+modules = (EPS, VPC)

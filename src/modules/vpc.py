@@ -68,7 +68,7 @@ class AuthStates(StatesGroup):
 
 
 @VPC.router.callback_query(F.data == VPC.name)
-async def main(call: CallbackQuery):
+async def vpc_main(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=keyboard())
     await call.answer()
 
