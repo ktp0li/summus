@@ -13,26 +13,18 @@ from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkvpc.v2 import VpcAsyncClient, ListVpcsRequest, ListVpcsResponse
 from huaweicloudsdkvpc.v2 import ShowVpcRequest, ShowVpcResponse
-from huaweicloudsdkvpc.v2 import CreateVpcRequest, CreateVpcOption, CreateVpcRequestBody
+from huaweicloudsdkvpc.v2 import CreateVpcRequest, CreateVpcOption, CreateVpcRequestBody, CreateVpcResponse
 from huaweicloudsdkvpc.v2 import DeleteVpcRequest, DeleteVpcResponse
 
 from src.module import Module
 from src.utils import add_exit_button
-from src.utils import get_endpoint
+
+endpoint = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
 
 VPC = Module(
     name='Virtual Private Cloud',
     router=Router(name='vpc')
 )
-
-cred = BasicCredentials('0HISGMSMIOSIB3I3LAFI',
-                        'Xi0iikywUYqfy2FnJFgDc4u12kKyWVEEkTAMf85f', 'b4df643b9d8e44a58b64605519482245')
-dbg_client = VpcAsyncClient.new_builder() \
-    .with_http_config(HttpConfig.get_default_config()) \
-    .with_credentials(cred) \
-    .with_endpoint(get_endpoint()) \
-    .build()
-
 
 class Action(str, Enum):
     AUTH = 'authorize'
@@ -76,10 +68,7 @@ class AuthStates(StatesGroup):
 
 
 @VPC.router.callback_query(F.data == VPC.name)
-async def main(call: CallbackQuery, state: FSMContext):
-    # TODO: fds
-    # await state.set_state(AuthStates.AUTHORIZED)
-
+async def main(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=keyboard())
     await call.answer()
 
@@ -120,7 +109,6 @@ async def vpc_auth_sk(message: types.Message, state: FSMContext):
     data = await state.get_data()
     ak = data['ak']
     project_id = data['project_id']
-    endpoint = get_endpoint()
 
     credentials = BasicCredentials(ak, sk, project_id)
 
@@ -199,18 +187,27 @@ async def vpc_create_projid(message: types.Message, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
 
-    vpc = CreateVpcOption(
-        cidr=data['cidr'],
-        name=data['name'],
-        description=data['description'],
-        enterprise_project_id=enterprise_project_id
-    )
+    try:
+        vpc = CreateVpcOption(
+            cidr=data['cidr'],
+            name=data['name'],
+            description=data['description'],
+            enterprise_project_id=enterprise_project_id
+        )
 
-    body = CreateVpcRequestBody(vpc)
-    request = CreateVpcRequest(body)
-    response = client.create_vpc_async(request)
+        body = CreateVpcRequestBody(vpc)
+        request = CreateVpcRequest(body)
+        response = client.create_vpc_async(request)
+        result = response.result() # type: CreateVpcResponse
 
-    print(response)
+        if result.vpc is None:
+            await message.answer('Ошибка!')
+            await message.answer(str(result))
+            await state.set_state(AuthStates.AUTHORIZED)
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(AuthStates.AUTHORIZED)
+        return
 
     await message.answer('Создано!')
     await state.set_state(AuthStates.AUTHORIZED)
@@ -255,16 +252,16 @@ async def vpc_delete(message: types.Message, state: FSMContext):
     client = data['client']  # type: VpcAsyncClient
 
     vid = message.text
-    request = ShowVpcRequest(vpc_id=vid)
 
     try:
+        request = DeleteVpcRequest(vpc_id=vid)
         response = client.delete_vpc_async(request)
         print(response)
     except exceptions.ClientRequestException as exc:
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.clear()
+        await state.set_state(AuthStates.AUTHORIZED)
         return
 
     await message.answer('это база')
@@ -288,16 +285,17 @@ async def vpc_show(message: types.Message, state: FSMContext):
     client = data['client']  # type: VpcAsyncClient
 
     vid = message.text
-    request = ShowVpcRequest(vpc_id=vid)
-
     try:
+        request = ShowVpcRequest(vpc_id=vid)
         response = client.show_vpc_async(request)
         result = response.result()  # type: ShowVpcResponse
+
+        await message.reply(str(result))
     except exceptions.ClientRequestException as exc:
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.clear()
+        await state.set_state(AuthStates.AUTHORIZED)
         return
 
     await state.clear()
