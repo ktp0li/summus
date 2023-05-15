@@ -52,7 +52,7 @@ def keyboard() -> InlineKeyboardMarkup:
 
     return builder.as_markup()
 
-class AuthStates(StatesGroup):
+class eps_AuthStates(StatesGroup):
     ACCOUNT_ID = State()
     AK = State()
     SK = State()
@@ -65,32 +65,32 @@ async def eps_main(call: CallbackQuery):
 
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.AUTH))
 async def eps_auth(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введите account ID')
-    await state.set_state(AuthStates.ACCOUNT_ID)
+    await call.message.answer('Введи account ID')
+    await state.set_state(eps_AuthStates.ACCOUNT_ID)
     await call.answer()
 
 
-@EPS.router.message(AuthStates.ACCOUNT_ID)
+@EPS.router.message(eps_AuthStates.ACCOUNT_ID)
 async def eps_auth_pjid(message: types.Message, state: FSMContext):
     account_id = message.text
 
     await state.update_data(account_id=account_id)
-    await message.answer('Введите AK')
-    await state.set_state(AuthStates.AK)
+    await message.answer('Введи AK')
+    await state.set_state(eps_AuthStates.AK)
 
 
-@EPS.router.message(AuthStates.AK)
+@EPS.router.message(eps_AuthStates.AK)
 async def eps_auth_ak(message: types.Message, state: FSMContext):
     ak = message.text
     await state.update_data(ak=ak)
-    await message.answer('Введите SK')
-    await state.set_state(AuthStates.SK)
+    await message.answer('Введи SK')
+    await state.set_state(eps_AuthStates.SK)
 
-@EPS.router.message(AuthStates.SK)
+@EPS.router.message(eps_AuthStates.SK)
 async def eps_auth_sk(message: types.Message, state: FSMContext):
     sk = message.text
     await state.update_data(sk=sk)
-    await message.answer('батя грит малаца. Ща проверим твои креды')
+    await message.answer('Батя грит малаца. Ща проверим твои креды')
 
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = False
@@ -108,3 +108,87 @@ async def eps_auth_sk(message: types.Message, state: FSMContext):
         .build()
 
     await state.update_data(client=client)
+
+    try:
+        client.list_enterprise_project_async(ListEnterpriseProjectRequest(limit=1)).result()
+    except exceptions.ClientRequestException as e:  # pylint: disable=C0103
+        print(e)
+        await message.answer('Неверные креды, бро. Попробуй ещё раз', reply_markup=keyboard())
+        await state.clear()
+        return
+
+    await message.answer('Всё нормально. Я проверил. Что делаем дальше?', reply_markup=keyboard())
+    await state.set_state(eps_AuthStates.AUTHORIZED)
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.UNAUTH))
+async def esp_unauth(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_text('Твои креды были почищены', reply_markup=keyboard())
+    await state.clear()
+    await call.answer()
+
+class eps_CreateStates(StatesGroup):
+    NAME = State()
+    DESCRIPTION = State()
+
+
+@EPS.router.callback_query(eps_AuthStates.AUTHORIZED, EpsCallback.filter(F.action == Action.CREATE))
+async def eps_create(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового проекта')
+    await state.set_state(eps_CreateStates.NAME)
+    await call.answer()
+
+@EPS.router.message(eps_CreateStates.NAME)
+async def eps_create_name(message: types.Message, state: FSMContext):
+    name = message.text
+
+    await message.answer('Введи описание')
+    await state.update_data(name=name)
+    await state.set_state(eps_CreateStates.DESCRIPTION)
+
+@EPS.router.message(eps_CreateStates.DESCRIPTION)
+async def eps_create_projid(message: types.Message, state: FSMContext):
+    description = message.text
+
+    data = await state.get_data()
+    client = data['client'] 
+
+    try:
+        request = CreateEnterpriseProjectRequest()
+        request.body = EnterpriseProject(data['name'], description)
+        response = client.create_enterprise_project_async(request)
+        result = response.result()
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(eps_AuthStates.AUTHORIZED)
+        return
+
+    await message.answer('Создано!')
+    await state.set_state(eps_AuthStates.AUTHORIZED)
+
+
+@EPS.router.callback_query(eps_AuthStates.AUTHORIZED, EpsCallback.filter(F.action == Action.LIST))
+async def eps_list(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']
+
+    request = ListEnterpriseProjectRequest()
+    response = client.list_enterprise_project_async(request)
+    result = response.result()
+
+    entry = []
+    for i in result.enterprise_projects:
+        entry += [f'<b>{i.name}</b>\n' + \
+                    f'\t id: <code>{i.id}</code>\n' + \
+                    f'\t description: {i.description}\n']
+
+    await call.message.answer('\n'.join(entry), parse_mode='html')
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action.in_(list(Action))))
+async def eps_not_authorized(call: CallbackQuery):
+    await call.message.edit_text('Бро, сначала тебе нужно авторизоваться. ' +
+                                 'Забери свои хайповые токены в личном кабинете',
+                                 reply_markup=keyboard())
+    await call.answer()
