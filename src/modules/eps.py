@@ -157,7 +157,7 @@ async def eps_create_desc(message: types.Message, state: FSMContext):
         request = CreateEnterpriseProjectRequest()
         request.body = EnterpriseProject(data['name'], description)
         response = client.create_enterprise_project_async(request)
-        result = response.result()
+        response.result()
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
         await state.set_state(eps_AuthStates.AUTHORIZED)
@@ -172,9 +172,14 @@ async def eps_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']
 
-    request = ListEnterpriseProjectRequest()
-    response = client.list_enterprise_project_async(request)
-    result = response.result()
+    try:
+        request = ListEnterpriseProjectRequest()
+        response = client.list_enterprise_project_async(request)
+        result = response.result()
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await state.set_state(eps_AuthStates.AUTHORIZED)
+        return
 
     entry = []
     for i in result.enterprise_projects:
@@ -208,7 +213,7 @@ async def eps_disable(message: types.Message, state: FSMContext):
         request = DisableEnterpriseProjectRequest(proj_id)
         request.body = DisableAction('disable')
         response = client.disable_enterprise_project_async(request)
-        result = response.result()
+        response.result()
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
         await state.set_state(eps_AuthStates.AUTHORIZED)
@@ -235,7 +240,7 @@ async def eps_enable(message: types.Message, state: FSMContext):
         request = EnableEnterpriseProjectRequest(proj_id)
         request.body = DisableAction('enable')
         response = client.enable_enterprise_project_async(request)
-        result = response.result()
+        response.result()
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
         await state.set_state(eps_AuthStates.AUTHORIZED)
@@ -244,6 +249,52 @@ async def eps_enable(message: types.Message, state: FSMContext):
     await message.answer('Включено!')
     await state.set_state(eps_AuthStates.AUTHORIZED)
 
+
+class eps_UpdateStates(StatesGroup):
+    PROJECT_ID = State()
+    NAME = State()
+    DESCRIPTION = State()
+
+@EPS.router.callback_query(eps_AuthStates.AUTHORIZED, EpsCallback.filter(F.action == Action.UPDATE))
+async def eps_update_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи айди изменяемого проекта')
+    await state.set_state(eps_UpdateStates.PROJECT_ID)
+    await call.answer()
+
+@EPS.router.message(eps_UpdateStates.PROJECT_ID)
+async def eps_update_name(message: types.Message, state: FSMContext):
+    project_id = message.text
+    await state.update_data(project_id=project_id)
+
+    await message.answer('Введи новое имя проекта')
+    await state.set_state(eps_UpdateStates.NAME)
+
+@EPS.router.message(eps_UpdateStates.NAME)
+async def eps_update_desc(message: types.Message, state: FSMContext):
+    name = message.text
+    await state.update_data(name=name)
+
+    await message.answer('Введи новое описание проекта')
+    await state.set_state(eps_UpdateStates.DESCRIPTION)
+
+@EPS.router.message(eps_UpdateStates.DESCRIPTION)
+async def eps_update(message: types.Message, state: FSMContext):
+    description = message.text
+    data = await state.get_data()
+    client = data['client']
+
+    try:
+        request = UpdateEnterpriseProjectRequest(data['project_id'])
+        request.body = EnterpriseProject(data['name'], description)
+        response = client.update_enterprise_project_async(request)
+        response.result()
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(eps_AuthStates.AUTHORIZED)
+        return
+
+    await message.answer('Данные о проекте обновлены!')
+    await state.set_state(eps_AuthStates.AUTHORIZED)
 
 @EPS.router.callback_query(EpsCallback.filter(F.action.in_(list(Action))))
 async def eps_not_authorized(call: CallbackQuery):
