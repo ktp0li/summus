@@ -11,15 +11,16 @@ from aiogram.fsm.context import FSMContext
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
-from huaweicloudsdkvpc.v2 import VpcAsyncClient, ListVpcsRequest
+from huaweicloudsdkvpc.v2 import VpcAsyncClient
 from huaweicloudsdkvpc.v2 import CreateSubnetOption, CreateSubnetRequest, CreateSubnetRequestBody, CreateSubnetResponse
 from huaweicloudsdkvpc.v2 import ListSubnetsRequest, ListSubnetsResponse
-from huaweicloudsdkvpc.v2 import DeleteSubnetRequest, DeleteSubnetResponse
+from huaweicloudsdkvpc.v2 import DeleteSubnetRequest
 from huaweicloudsdkvpc.v2 import ShowSubnetRequest, ShowSubnetResponse
 from huaweicloudsdkvpc.v2 import UpdateSubnetOption, UpdateSubnetRequest, UpdateSubnetRequestBody, UpdateSubnetResponse
 
 from src.module import Module
 from src.utils import add_exit_button
+from src.globalstate import GlobalState
 
 endpoint = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
 
@@ -30,13 +31,11 @@ SUBNET = Module(
 
 
 class Action(str, Enum):
-    AUTH = 'authorize'
     CREATE = 'create'
     LIST = 'list'
     SHOW = 'show'
     UPDATE = 'update'
     DELETE = 'delete'
-    UNAUTH = 'unauthorize'
 
 
 class SubnetCallback(CallbackData, prefix='subnet'):
@@ -58,58 +57,18 @@ def keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-class subnet_AuthStates(StatesGroup):
-    PROJECT_ID = State()
-    AK = State()
-    SK = State()
-    AUTHORIZED = State()
-
-
 @SUBNET.router.callback_query(F.data == SUBNET.name)
-async def subnet_main(call: CallbackQuery):
-    text = '''Привет! Для создания подсети необходимо сначала создать VPC'''
-    await call.message.edit_reply_markup(text=text, reply_markup=keyboard())
-    await call.answer()
-
-
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.AUTH))
-async def subnet_auth(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введи project ID')
-    await state.set_state(subnet_AuthStates.PROJECT_ID)
-    await call.answer()
-
-
-@SUBNET.router.message(subnet_AuthStates.PROJECT_ID)
-async def subnet_auth_pjid(message: types.Message, state: FSMContext):
-    project_id = message.text
-
-    await state.update_data(project_id=project_id)
-    await message.answer('Введи AK')
-    await state.set_state(subnet_AuthStates.AK)
-
-
-@SUBNET.router.message(subnet_AuthStates.AK)
-async def subnet_auth_ak(message: types.Message, state: FSMContext):
-    ak = message.text
-    await state.update_data(ak=ak)
-    await message.answer('Введит SK')
-    await state.set_state(subnet_AuthStates.SK)
-
-
-@SUBNET.router.message(subnet_AuthStates.SK)
-async def subnet_auth_sk(message: types.Message, state: FSMContext):
-    sk = message.text
-    await state.update_data(sk=sk)
-    await message.answer('Батя грит малаца. Ща проверим твои креды')
-
+async def subnet_main(call: CallbackQuery, state: FSMContext):
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = False
 
     data = await state.get_data()
-    ak = data['ak']
-    project_id = data['project_id']
 
-    credentials = BasicCredentials(ak, sk, project_id)
+    credentials = BasicCredentials(
+        ak=data['ak'],
+        sk=data['sk'],
+        project_id=data['project_id'],
+    )
 
     client = VpcAsyncClient().new_builder() \
         .with_http_config(config) \
@@ -119,67 +78,52 @@ async def subnet_auth_sk(message: types.Message, state: FSMContext):
 
     await state.update_data(client=client)
 
-    try:
-        client.list_vpcs_async(ListVpcsRequest(limit=1)).result()
-    except exceptions.ClientRequestException as e:  # pylint: disable=C0103
-        print(e)
-        await message.answer('Неверные креды, бро. Попробуй ещё раз', reply_markup=keyboard())
-        await state.clear()
-        return
-
-    await message.answer('Всё нормально. Я проверил. Что делаем дальше?', reply_markup=keyboard())
-    await state.set_state(subnet_AuthStates.AUTHORIZED)
-
-
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.UNAUTH))
-async def subnet_unauth(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text('Твои креды были почищены', reply_markup=keyboard())
-    await state.clear()
+    await call.message.edit_reply_markup(reply_markup=keyboard())
     await call.answer()
 
 
-class subnet_CreateStates(StatesGroup):
+class SubnetCreateStates(StatesGroup):
     NAME = State()
     DESCRIPTION = State()
     CIDR = State()
     VPC_ID = State()
 
 
-@SUBNET.router.callback_query(subnet_AuthStates.AUTHORIZED, SubnetCallback.filter(F.action == Action.CREATE))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.CREATE))
 async def subnet_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового сабнета')
-    await state.set_state(subnet_CreateStates.NAME)
+    await state.set_state(SubnetCreateStates.NAME)
     await call.answer()
 
 
-@SUBNET.router.message(subnet_CreateStates.NAME)
+@SUBNET.router.message(SubnetCreateStates.NAME)
 async def subnet_create_name(message: types.Message, state: FSMContext):
     name = message.text
 
     await message.answer('Введи описание')
     await state.update_data(name=name)
-    await state.set_state(subnet_CreateStates.DESCRIPTION)
+    await state.set_state(SubnetCreateStates.DESCRIPTION)
 
 
-@SUBNET.router.message(subnet_CreateStates.DESCRIPTION)
+@SUBNET.router.message(SubnetCreateStates.DESCRIPTION)
 async def subnet_create_description(message: types.Message, state: FSMContext):
     description = message.text
 
     await state.update_data(description=description)
     await message.answer('введи CIDR')
-    await state.set_state(subnet_CreateStates.CIDR)
+    await state.set_state(SubnetCreateStates.CIDR)
 
 
-@SUBNET.router.message(subnet_CreateStates.CIDR)
+@SUBNET.router.message(SubnetCreateStates.CIDR)
 async def subnet_create_cidr(message: types.Message, state: FSMContext):
     cidr = message.text
     await state.update_data(cidr=cidr)
 
     await message.answer('введи vpc id')
-    await state.set_state(subnet_CreateStates.VPC_ID)
+    await state.set_state(SubnetCreateStates.VPC_ID)
 
 
-@SUBNET.router.message(subnet_CreateStates.VPC_ID)
+@SUBNET.router.message(SubnetCreateStates.VPC_ID)
 async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
     vpc_id = message.text
     gateway_ip = '10.0.0.1'
@@ -204,17 +148,17 @@ async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
         if result.subnet is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(subnet_AuthStates.AUTHORIZED)
+            await state.set_state(GlobalState.DEFAULT)
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
-        await state.set_state(subnet_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Создано!')
-    await state.set_state(subnet_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
-@SUBNET.router.callback_query(subnet_AuthStates.AUTHORIZED, SubnetCallback.filter(F.action == Action.LIST))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.LIST))
 async def subnet_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
@@ -242,7 +186,7 @@ class subnet_DeleteStates(StatesGroup):
     VPC_ID = State()
 
 
-@SUBNET.router.callback_query(subnet_AuthStates.AUTHORIZED, SubnetCallback.filter(F.action == Action.DELETE))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.DELETE))
 async def subnet_delete_subnet_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id сабнета')
     await state.set_state(subnet_DeleteStates.SUBNET_ID)
@@ -273,18 +217,18 @@ async def subnet_delete(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(subnet_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Удалено')
-    await state.set_state(subnet_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
 class subnet_ShowStates(StatesGroup):
     ID = State()
 
 
-@SUBNET.router.callback_query(subnet_AuthStates.AUTHORIZED, SubnetCallback.filter(F.action == Action.SHOW))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.SHOW))
 async def subnet_show_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id сабнета')
     await state.set_state(subnet_ShowStates.ID)
@@ -307,10 +251,10 @@ async def subnet_show(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(subnet_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
-    await state.set_state(subnet_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
 class subnet_UpdateStates(StatesGroup):
@@ -320,7 +264,7 @@ class subnet_UpdateStates(StatesGroup):
     DESCRIPTION = State()
 
 
-@SUBNET.router.callback_query(subnet_AuthStates.AUTHORIZED, SubnetCallback.filter(F.action == Action.UPDATE))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.UPDATE))
 async def subnet_update_subnet_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id сабнета')
     await state.set_state(subnet_UpdateStates.SUBNET_ID)
@@ -375,22 +319,14 @@ async def subnet_update(message: types.Message, state: FSMContext):
         if result.subnet is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(subnet_AuthStates.AUTHORIZED)
+            await state.set_state(GlobalState.DEFAULT)
             return
     except exceptions.ClientRequestException as exc:
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(subnet_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Данные обновлены')
-    await state.set_state(subnet_AuthStates.AUTHORIZED)
-
-
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action.in_(list(Action))))
-async def subnet_not_authorized(call: CallbackQuery):
-    await call.message.edit_text('Бро сначала тебе нужно авторизоваться. ' +
-                                 'Забери свои хайповые токены в личном кабинете',
-                                 reply_markup=keyboard())
-    await call.answer()
+    await state.set_state(GlobalState.DEFAULT)

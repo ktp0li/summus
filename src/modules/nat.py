@@ -13,12 +13,13 @@ from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdknat.v2 import NatAsyncClient, ListNatGatewaysRequest, ListNatGatewaysResponse
 from huaweicloudsdknat.v2 import CreateNatGatewayOption, CreateNatGatewayRequest, CreateNatGatewayRequestBody, CreateNatGatewayResponse
-from huaweicloudsdknat.v2 import DeleteNatGatewayRequest, DeleteNatGatewayResponse
+from huaweicloudsdknat.v2 import DeleteNatGatewayRequest
 from huaweicloudsdknat.v2 import ShowNatGatewayRequest, ShowNatGatewayResponse
 from huaweicloudsdknat.v2 import UpdateNatGatewayOption, UpdateNatGatewayRequest, UpdateNatGatewayRequestBody
 
 from src.module import Module
 from src.utils import add_exit_button
+from src.globalstate import GlobalState
 
 endpoint = 'https://nat.ru-moscow-1.hc.sbercloud.ru'
 
@@ -29,13 +30,11 @@ NAT = Module(
 
 
 class Action(str, Enum):
-    AUTH = 'authorize'
     CREATE = 'create'
     LIST = 'list'
     SHOW = 'show'
     UPDATE = 'update'
     DELETE = 'delete'
-    UNAUTH = 'unauthorize'
 
 
 class NatCallback(CallbackData, prefix='nat'):
@@ -57,57 +56,18 @@ def keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-class nat_AuthStates(StatesGroup):
-    PROJECT_ID = State()
-    AK = State()
-    SK = State()
-    AUTHORIZED = State()
-
-
 @NAT.router.callback_query(F.data == NAT.name)
-async def nat_main(call: CallbackQuery):
-    await call.message.edit_reply_markup(reply_markup=keyboard())
-    await call.answer()
-
-
-@NAT.router.callback_query(NatCallback.filter(F.action == Action.AUTH))
-async def nat_auth(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введи project ID')
-    await state.set_state(nat_AuthStates.PROJECT_ID)
-    await call.answer()
-
-
-@NAT.router.message(nat_AuthStates.PROJECT_ID)
-async def nat_auth_pjid(message: types.Message, state: FSMContext):
-    project_id = message.text
-
-    await state.update_data(project_id=project_id)
-    await message.answer('Введи AK')
-    await state.set_state(nat_AuthStates.AK)
-
-
-@NAT.router.message(nat_AuthStates.AK)
-async def nat_auth_ak(message: types.Message, state: FSMContext):
-    ak = message.text
-    await state.update_data(ak=ak)
-    await message.answer('Введит SK')
-    await state.set_state(nat_AuthStates.SK)
-
-
-@NAT.router.message(nat_AuthStates.SK)
-async def nat_auth_sk(message: types.Message, state: FSMContext):
-    sk = message.text
-    await state.update_data(sk=sk)
-    await message.answer('Батя грит малаца. Ща проверим твои креды')
-
+async def nat_main(call: CallbackQuery, state: FSMContext):
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = False
 
     data = await state.get_data()
-    ak = data['ak']
-    project_id = data['project_id']
 
-    credentials = BasicCredentials(ak, sk, project_id)
+    credentials = BasicCredentials(
+        ak=data['ak'],
+        sk=data['sk'],
+        project_id=data['project_id'],
+    )
 
     client = NatAsyncClient().new_builder() \
         .with_http_config(config) \
@@ -117,27 +77,11 @@ async def nat_auth_sk(message: types.Message, state: FSMContext):
 
     await state.update_data(client=client)
 
-    try:
-        client.list_nat_gateways_async(
-            ListNatGatewaysRequest(limit=1)).result()
-    except exceptions.ClientRequestException as e:  # pylint: disable=C0103
-        print(e)
-        await message.answer('Неверные креды, бро. Попробуй ещё раз', reply_markup=keyboard())
-        await state.clear()
-        return
-
-    await message.answer('Всё нормально. Я проверил. Что делаем дальше?', reply_markup=keyboard())
-    await state.set_state(nat_AuthStates.AUTHORIZED)
-
-
-@NAT.router.callback_query(NatCallback.filter(F.action == Action.UNAUTH))
-async def nat_unauth(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text('Твои креды были почищены', reply_markup=keyboard())
-    await state.clear()
+    await call.message.edit_reply_markup(reply_markup=keyboard())
     await call.answer()
 
 
-class nat_CreateStates(StatesGroup):
+class NatCreateStates(StatesGroup):
     NAME = State()
     DESCRIPTION = State()
     ROUTER_ID = State()
@@ -146,59 +90,59 @@ class nat_CreateStates(StatesGroup):
     ENTERPRISE_PROJECT_ID = State()
 
 
-@NAT.router.callback_query(nat_AuthStates.AUTHORIZED, NatCallback.filter(F.action == Action.CREATE))
+@NAT.router.callback_query(NatCallback.filter(F.action == Action.CREATE))
 async def nat_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового NAT')
-    await state.set_state(nat_CreateStates.NAME)
+    await state.set_state(NatCreateStates.NAME)
     await call.answer()
 
 
-@NAT.router.message(nat_CreateStates.NAME)
+@NAT.router.message(NatCreateStates.NAME)
 async def nat_create_name(message: types.Message, state: FSMContext):
     name = message.text
 
     await message.answer('Введи описание')
     await state.update_data(name=name)
-    await state.set_state(nat_CreateStates.DESCRIPTION)
+    await state.set_state(NatCreateStates.DESCRIPTION)
 
 
-@NAT.router.message(nat_CreateStates.DESCRIPTION)
+@NAT.router.message(NatCreateStates.DESCRIPTION)
 async def nat_create_description(message: types.Message, state: FSMContext):
     description = message.text
 
     await state.update_data(description=description)
     await message.answer('введи id роутера (VPC)')
-    await state.set_state(nat_CreateStates.ROUTER_ID)
+    await state.set_state(NatCreateStates.ROUTER_ID)
 
 
-@NAT.router.message(nat_CreateStates.ROUTER_ID)
+@NAT.router.message(NatCreateStates.ROUTER_ID)
 async def nat_create_router_id(message: types.Message, state: FSMContext):
     router_id = message.text
 
     await state.update_data(router_id=router_id)
     await message.answer('введи spec (1, 2, 3, 4)')
-    await state.set_state(nat_CreateStates.SPEC)
+    await state.set_state(NatCreateStates.SPEC)
 
 
-@NAT.router.message(nat_CreateStates.SPEC)
+@NAT.router.message(NatCreateStates.SPEC)
 async def nat_create_spec(message: types.Message, state: FSMContext):
     spec = message.text
 
     await state.update_data(spec=spec)
     await message.answer('введи id сабнетворка')
-    await state.set_state(nat_CreateStates.SUBNET_ID)
+    await state.set_state(NatCreateStates.SUBNET_ID)
 
 
-@NAT.router.message(nat_CreateStates.SUBNET_ID)
+@NAT.router.message(NatCreateStates.SUBNET_ID)
 async def nat_create_subnet_id(message: types.Message, state: FSMContext):
     subnet_id = message.text
     await state.update_data(subnet_id=subnet_id)
 
     await message.answer('введи Enterprise project id (или 0)')
-    await state.set_state(nat_CreateStates.ENTERPRISE_PROJECT_ID)
+    await state.set_state(NatCreateStates.ENTERPRISE_PROJECT_ID)
 
 
-@NAT.router.message(nat_CreateStates.ENTERPRISE_PROJECT_ID)
+@NAT.router.message(NatCreateStates.ENTERPRISE_PROJECT_ID)
 async def nat_create_projid(message: types.Message, state: FSMContext):
     enterprise_project_id = message.text
 
@@ -223,18 +167,18 @@ async def nat_create_projid(message: types.Message, state: FSMContext):
         if result.nat_gateway is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(nat_AuthStates.AUTHORIZED)
+            await state.set_state(GlobalState.DEFAULT)
             return
     except exceptions.ClientRequestException as e:
         await message.answer(e.error_msg)
-        await state.set_state(nat_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Создано!')
-    await state.set_state(nat_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
-@NAT.router.callback_query(nat_AuthStates.AUTHORIZED, NatCallback.filter(F.action == Action.LIST))
+@NAT.router.callback_query(GlobalState.DEFAULT, NatCallback.filter(F.action == Action.LIST))
 async def nat_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: NatAsyncClient
@@ -261,7 +205,7 @@ class nat_DeleteStates(StatesGroup):
     ID = State()
 
 
-@NAT.router.callback_query(nat_AuthStates.AUTHORIZED, NatCallback.filter(F.action == Action.DELETE))
+@NAT.router.callback_query(GlobalState.DEFAULT, NatCallback.filter(F.action == Action.DELETE))
 async def nat_delete_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id ната')
     await state.set_state(nat_DeleteStates.ID)
@@ -283,18 +227,18 @@ async def nat_delete(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(nat_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('это база')
-    await state.set_state(nat_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
 class nat_ShowStates(StatesGroup):
     ID = State()
 
 
-@NAT.router.callback_query(nat_AuthStates.AUTHORIZED, NatCallback.filter(F.action == Action.SHOW))
+@NAT.router.callback_query(GlobalState.DEFAULT, NatCallback.filter(F.action == Action.SHOW))
 async def nat_show_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи nat id')
     await state.set_state(nat_ShowStates.ID)
@@ -315,7 +259,7 @@ async def nat_show(message: types.Message, state: FSMContext):
         if result.nat_gateway is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(nat_AuthStates.AUTHORIZED)
+            await state.set_state(GlobalState.DEFAULT)
             return
         
         await message.answer(str(result))
@@ -324,10 +268,10 @@ async def nat_show(message: types.Message, state: FSMContext):
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(nat_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
-    await state.set_state(nat_AuthStates.AUTHORIZED)
+    await state.set_state(GlobalState.DEFAULT)
 
 
 class nat_UpdateStates(StatesGroup):
@@ -337,7 +281,7 @@ class nat_UpdateStates(StatesGroup):
     SPEC = State()
 
 
-@NAT.router.callback_query(nat_AuthStates.AUTHORIZED, NatCallback.filter(F.action == Action.UPDATE))
+@NAT.router.callback_query(GlobalState.DEFAULT, NatCallback.filter(F.action == Action.UPDATE))
 async def nat_update_vpc_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи nat id')
     await state.set_state(nat_UpdateStates.NAT_ID)
@@ -392,22 +336,14 @@ async def nat_update(message: types.Message, state: FSMContext):
         if result.nat_gateway is None:
             await message.answer('Ошибка!')
             await message.answer(str(result))
-            await state.set_state(nat_AuthStates.AUTHORIZED)
+            await state.set_state(GlobalState.DEFAULT)
             return
     except exceptions.ClientRequestException as exc:
         await message.answer(exc.error_msg)
 
         # TODO: ещё попытку
-        await state.set_state(nat_AuthStates.AUTHORIZED)
+        await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Данные обновлены')
-    await state.set_state(nat_AuthStates.AUTHORIZED)
-
-
-@NAT.router.callback_query(NatCallback.filter(F.action.in_(list(Action))))
-async def nat_not_authorized(call: CallbackQuery):
-    await call.message.edit_text('Бро сначала тебе нужно авторизоваться. ' +
-                                 'Забери свои хайповые токены в личном кабинете',
-                                 reply_markup=keyboard())
-    await call.answer()
+    await state.set_state(GlobalState.DEFAULT)

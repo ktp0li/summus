@@ -6,13 +6,13 @@ from aiogram import Dispatcher, Bot
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.modules import modules
-from src.menu import MENU
+from src.start import START
 
 
 def create_dispatcher() -> Dispatcher:
     storage = MemoryStorage()
     dispatcher = Dispatcher(storage=storage)
-    dispatcher.include_router(MENU.router)
+    dispatcher.include_router(START.router)
 
     for module in modules:
         dispatcher.include_router(module.router)
