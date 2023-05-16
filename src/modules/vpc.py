@@ -14,6 +14,7 @@ from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkvpc.v2 import VpcAsyncClient, ListVpcsRequest, ListVpcsResponse
 from huaweicloudsdkvpc.v2 import ShowVpcRequest, ShowVpcResponse
 from huaweicloudsdkvpc.v2 import CreateVpcRequest, CreateVpcOption, CreateVpcRequestBody, CreateVpcResponse
+from huaweicloudsdkvpc.v2 import UpdateVpcOption, UpdateVpcRequestBody, UpdateVpcRequest, UpdateVpcResponse
 from huaweicloudsdkvpc.v2 import DeleteVpcRequest
 
 from src.module import Module
@@ -25,6 +26,7 @@ VPC = Module(
     name='Virtual Private Cloud',
     router=Router(name='vpc')
 )
+
 
 class Action(str, Enum):
     AUTH = 'authorize'
@@ -193,7 +195,7 @@ async def vpc_create_projid(message: types.Message, state: FSMContext):
         body = CreateVpcRequestBody(vpc)
         request = CreateVpcRequest(body)
         response = client.create_vpc_async(request)
-        result = response.result() # type: CreateVpcResponse
+        result = response.result()  # type: CreateVpcResponse
 
         if result.vpc is None:
             await message.answer('Ошибка!')
@@ -293,6 +295,81 @@ async def vpc_show(message: types.Message, state: FSMContext):
         await state.set_state(vpc_AuthStates.AUTHORIZED)
         return
 
+    await state.set_state(vpc_AuthStates.AUTHORIZED)
+
+
+class vpc_UpdateStates(StatesGroup):
+    VPC_ID = State()
+    NAME = State()
+    DESCRIPTION = State()
+    CIDR = State()
+
+
+@VPC.router.callback_query(vpc_AuthStates.AUTHORIZED, VpcCallback.filter(F.action == Action.UPDATE))
+async def vpc_update_vpc_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи vpc id')
+    await state.set_state(vpc_UpdateStates.VPC_ID)
+    await call.answer()
+
+
+@VPC.router.message(vpc_UpdateStates.VPC_ID)
+async def vpc_update_name(message: types.Message, state: FSMContext):
+    vpc_id = message.text
+    await state.update_data(vpc_id=vpc_id)
+
+    await message.answer('Введи новое имя')
+    await state.set_state(vpc_UpdateStates.NAME)
+
+
+@VPC.router.message(vpc_UpdateStates.NAME)
+async def vpc_update_desc(message: types.Message, state: FSMContext):
+    name = message.text
+    await state.update_data(name=name)
+
+    await message.answer('Введи новое описание')
+    await state.set_state(vpc_UpdateStates.DESCRIPTION)
+
+
+@VPC.router.message(vpc_UpdateStates.DESCRIPTION)
+async def vpc_update_cidr(message: types.Message, state: FSMContext):
+    desc = message.text
+    await state.update_data(desc=desc)
+
+    await message.answer('Введи CIDR')
+    await state.set_state(vpc_UpdateStates.CIDR)
+
+
+@VPC.router.message(vpc_UpdateStates.CIDR)
+async def vpc_update(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    cidr = message.text
+    try:
+        vpc = UpdateVpcOption(
+            name=data['name'],
+            description=data['desc'],
+            cidr=cidr
+        )
+        body = UpdateVpcRequestBody(vpc)
+        request = UpdateVpcRequest(body=body, vpc_id=data['vpc_id'])
+
+        response = client.update_vpc_async(request)
+        result = response.result()  # type: UpdateVpcResponse
+
+        if result.vpc is None:
+            await message.answer('Ошибка!')
+            await message.answer(str(result))
+            await state.set_state(vpc_AuthStates.AUTHORIZED)
+            return
+    except exceptions.ClientRequestException as exc:
+        await message.answer(exc.error_msg)
+
+        # TODO: ещё попытку
+        await state.set_state(vpc_AuthStates.AUTHORIZED)
+        return
+
+    await message.answer('Данные обновлены')
     await state.set_state(vpc_AuthStates.AUTHORIZED)
 
 
