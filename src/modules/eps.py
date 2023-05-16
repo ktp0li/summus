@@ -13,13 +13,14 @@ from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkeps.v1 import (EpsAsyncClient, ListEnterpriseProjectRequest,
                                   CreateEnterpriseProjectRequest, EnterpriseProject,
                                   EnableEnterpriseProjectRequest, DisableAction,
-                                  DisableEnterpriseProjectRequest, UpdateEnterpriseProjectRequest)
+                                  DisableEnterpriseProjectRequest, UpdateEnterpriseProjectRequest,
+                                  ShowEnterpriseProjectRequest)
 
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
 
-endpoint = 'https://eps.ru-moscow-1.hc.sbercloud.ru'
+ENDPOINT = 'https://eps.ru-moscow-1.hc.sbercloud.ru'
 
 EPS = Module(
     name='Enterprise Project Management Service',
@@ -30,9 +31,13 @@ EPS = Module(
 class Action(str, Enum):
     CREATE = 'create'
     LIST = 'list'
+    SHOW = 'show'
     UPDATE = 'update'
     ENABLE = 'enable'
     DISABLE = 'disable'
+    UPDATE_BY_ID = 'update by id'
+    ENABLE_BY_ID = 'enable by id'
+    DISABLE_BY_ID = 'disable by id'
 
 
 class EpsCallback(CallbackData, prefix='eps'):
@@ -70,7 +75,7 @@ async def eps_main(call: CallbackQuery, state: FSMContext):
     client = EpsAsyncClient().new_builder() \
         .with_http_config(config) \
         .with_credentials(credentials) \
-        .with_endpoint(endpoint) \
+        .with_endpoint(ENDPOINT) \
         .build()
 
     await state.update_data(client=client)
@@ -121,6 +126,65 @@ async def eps_create_desc(message: types.Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
 
+def __eps_to_str(eps) -> str:
+    text = f'<b>{eps.name}</b>: {eps.description}\n' + \
+        f'\t id: <code>{eps.id}</code>\n' + \
+        f'\t status: <b>{"enabled" if eps.status == 1 else "disabled"}</b>\n'
+
+    return text
+
+
+def __create_epss_keyboard(client, callbacktype):
+    request = ListEnterpriseProjectRequest()
+    response = client.list_enterprise_project_async(request)
+    result = response.result()
+
+    builder = InlineKeyboardBuilder()
+
+    for eps in result.enterprise_projects:
+        builder.button(
+            text=eps.name,
+            callback_data=callbacktype(action='do', id=eps.id),
+        )
+    builder.button(text='Назад', callback_data=callbacktype(
+        action='back', id='____'))
+
+    return builder.as_markup()
+
+
+class EpsShowCallback(CallbackData, prefix='eps_show'):
+    action: str
+    id: str
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.SHOW))
+async def eps_show_buttons(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+    await call.message.edit_text('Выбери EPS', reply_markup=__create_epss_keyboard(client, EpsShowCallback))
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsShowCallback.filter(F.action == 'back'))
+async def eps_show_buttons_back(call: CallbackQuery):
+    await call.message.edit_text('Enterprise Project Management', reply_markup=keyboard())
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsShowCallback.filter(F.action == 'do'))
+async def eps_show_buttons_entry(call: CallbackQuery, state: FSMContext, callback_data: EpsShowCallback):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+
+    request = ShowEnterpriseProjectRequest(
+        enterprise_project_id=callback_data.id)
+    response = client.show_enterprise_project_async(request)
+    result = response.result()
+
+    await call.message.reply(__eps_to_str(result.enterpise_project), parse_mode='html')
+    await call.answer()
+
+
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.LIST))
 async def eps_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -135,31 +199,103 @@ async def eps_list(call: CallbackQuery, state: FSMContext):
         await state.set_state(GlobalState.DEFAULT)
         return
 
-    entry = []
-    for i in result.enterprise_projects:
-        entry += [f'<b>{i.name}</b>\n' +
-                  f'\t id: <code>{i.id}</code>\n' +
-                  f'\t description: {i.description}\n'
-                  f'\t status: {"enabled" if i.status == 1 else "disabled"}\n']
-
+    entry = [__eps_to_str(eps) for eps in result.enterprise_projects]
     await call.message.answer('\n'.join(entry), parse_mode='html')
     await call.answer()
 
 
-class eps_ProjectStates(StatesGroup):
+class EpsDisableCallback(CallbackData, prefix='eps_disable'):
+    action: str
+    id: str
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.DISABLE))
+async def eps_disable(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+    await call.message.edit_text('Выбери EPS для отключения', reply_markup=__create_epss_keyboard(client, EpsDisableCallback))
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsDisableCallback.filter(F.action == 'do'))
+async def eps_disable_entry(call: CallbackQuery, state: FSMContext, callback_data: EpsDisableCallback):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+
+    try:
+        request = DisableEnterpriseProjectRequest(
+            enterprise_project_id=callback_data.id)
+        request.body = DisableAction('disable')
+        response = client.disable_enterprise_project_async(request)
+        response.result()
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await call.answer()
+        return
+
+    await call.message.answer('Выключено!')
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsDisableCallback.filter(F.action == 'back'))
+async def eps_disable_back(call: CallbackQuery):
+    await call.message.edit_text('Enterprise Project Management', reply_markup=keyboard())
+    await call.answer()
+
+
+class EpsEnableCallback(CallbackData, prefix='eps_enable'):
+    action: str
+    id: str
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.DISABLE))
+async def eps_enable(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+    await call.message.edit_text('Выбери EPS для отключения', reply_markup=__create_epss_keyboard(client, EpsEnableCallback))
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsEnableCallback.filter(F.action == 'do'))
+async def eps_enable_entry(call: CallbackQuery, state: FSMContext, callback_data: EpsDisableCallback):
+    data = await state.get_data()
+    client = data['client']
+
+    try:
+        request = EnableEnterpriseProjectRequest(
+            enterprise_project_id=callback_data.id)
+        request.body = DisableAction('enable')
+        response = client.enable_enterprise_project_async(request)
+        response.result()
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await call.answer()
+        return
+
+    await call.message.answer('Включено!')
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsEnableCallback.filter(F.action == 'back'))
+async def eps_enable_back(call: CallbackQuery):
+    await call.message.edit_text('Enterprise Project Management', reply_markup=keyboard())
+    await call.answer()
+
+
+class EpsProjectStates(StatesGroup):
     ENABLE = State()
     DISABLE = State()
 
 
-@EPS.router.callback_query(GlobalState.DEFAULT, EpsCallback.filter(F.action == Action.DISABLE))
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.DISABLE_BY_ID))
 async def eps_disable_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи айди выключаемого проекта')
-    await state.set_state(eps_ProjectStates.DISABLE)
+    await state.set_state(EpsProjectStates.DISABLE)
     await call.answer()
 
 
-@EPS.router.message(eps_ProjectStates.DISABLE)
-async def eps_disable(message: types.Message, state: FSMContext):
+@EPS.router.message(EpsProjectStates.DISABLE)
+async def eps_disable_by_id(message: types.Message, state: FSMContext):
     proj_id = message.text
 
     data = await state.get_data()
@@ -179,15 +315,15 @@ async def eps_disable(message: types.Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
 
-@EPS.router.callback_query(EpsCallback.filter(F.action == Action.ENABLE))
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.ENABLE_BY_ID))
 async def eps_enable_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи айди включаемого проекта')
-    await state.set_state(eps_ProjectStates.ENABLE)
+    await state.set_state(EpsProjectStates.ENABLE)
     await call.answer()
 
 
-@EPS.router.message(eps_ProjectStates.ENABLE)
-async def eps_enable(message: types.Message, state: FSMContext):
+@EPS.router.message(EpsProjectStates.ENABLE)
+async def eps_enable_by_id(message: types.Message, state: FSMContext):
     proj_id = message.text
 
     data = await state.get_data()
@@ -207,39 +343,39 @@ async def eps_enable(message: types.Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
 
-class eps_UpdateStates(StatesGroup):
+class EpsUpdateStates(StatesGroup):
     PROJECT_ID = State()
     NAME = State()
     DESCRIPTION = State()
 
 
-@EPS.router.callback_query(EpsCallback.filter(F.action == Action.UPDATE))
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.UPDATE_BY_ID))
 async def eps_update_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи айди изменяемого проекта')
-    await state.set_state(eps_UpdateStates.PROJECT_ID)
+    await state.set_state(EpsUpdateStates.PROJECT_ID)
     await call.answer()
 
 
-@EPS.router.message(eps_UpdateStates.PROJECT_ID)
+@EPS.router.message(EpsUpdateStates.PROJECT_ID)
 async def eps_update_name(message: types.Message, state: FSMContext):
     project_id = message.text
     await state.update_data(project_id=project_id)
 
     await message.answer('Введи новое имя проекта')
-    await state.set_state(eps_UpdateStates.NAME)
+    await state.set_state(EpsUpdateStates.NAME)
 
 
-@EPS.router.message(eps_UpdateStates.NAME)
+@EPS.router.message(EpsUpdateStates.NAME)
 async def eps_update_desc(message: types.Message, state: FSMContext):
     name = message.text
     await state.update_data(name=name)
 
     await message.answer('Введи новое описание проекта')
-    await state.set_state(eps_UpdateStates.DESCRIPTION)
+    await state.set_state(EpsUpdateStates.DESCRIPTION)
 
 
-@EPS.router.message(eps_UpdateStates.DESCRIPTION)
-async def eps_update(message: types.Message, state: FSMContext):
+@EPS.router.message(EpsUpdateStates.DESCRIPTION)
+async def eps_update_by_id(message: types.Message, state: FSMContext):
     description = message.text
     data = await state.get_data()
     client = data['client']
@@ -257,3 +393,29 @@ async def eps_update(message: types.Message, state: FSMContext):
     await message.answer('Данные о проекте обновлены!')
     await state.set_state(GlobalState.DEFAULT)
 
+
+class EpsUpdateCallback(CallbackData, prefix='eps_update'):
+    action: str
+    id: str
+
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.UPDATE))
+async def eps_update(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: EpsAsyncClient
+    await call.message.edit_text('Выбери EPS для изменения', reply_markup=__create_epss_keyboard(client, EpsUpdateCallback))
+    await call.answer()
+
+
+@EPS.router.callback_query(EpsUpdateCallback.filter(F.action == 'do'))
+async def eps_update_entry(call: CallbackQuery, state: FSMContext, callback_data: EpsUpdateCallback):
+    await state.update_data(project_id=callback_data.id)
+    await call.message.answer('Введите новое имя')
+    await call.answer()
+    await state.set_state(EpsUpdateStates.NAME)
+
+
+@EPS.router.callback_query(EpsUpdateCallback.filter(F.action == 'back'))
+async def eps_update_back(call: CallbackQuery):
+    await call.message.edit_text('Enterprise Project Management', reply_markup=keyboard())
+    await call.answer()
