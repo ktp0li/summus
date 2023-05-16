@@ -22,7 +22,7 @@ from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
 
-endpoint = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
+ENDPOINT = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
 
 SUBNET = Module(
     name='Subnet',
@@ -33,9 +33,12 @@ SUBNET = Module(
 class Action(str, Enum):
     CREATE = 'create'
     LIST = 'list'
+    SHOW_BY_ID = 'show by id'
     SHOW = 'show'
     UPDATE = 'update'
+    UPDATE_BY_ID = 'update by id'
     DELETE = 'delete'
+    DELETE_BY_ID = 'delete by id'
 
 
 class SubnetCallback(CallbackData, prefix='subnet'):
@@ -73,7 +76,7 @@ async def subnet_main(call: CallbackQuery, state: FSMContext):
     client = VpcAsyncClient().new_builder() \
         .with_http_config(config) \
         .with_credentials(credentials) \
-        .with_endpoint(endpoint) \
+        .with_endpoint(ENDPOINT) \
         .build()
 
     await state.update_data(client=client)
@@ -126,6 +129,8 @@ async def subnet_create_cidr(message: types.Message, state: FSMContext):
 @SUBNET.router.message(SubnetCreateStates.VPC_ID)
 async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
     vpc_id = message.text
+
+    # TODO: сделать это НЕ константой
     gateway_ip = '10.0.0.1'
 
     data = await state.get_data()
@@ -158,6 +163,35 @@ async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
 
+def __subnet_to_str(subnet) -> str:
+    text = f'<b>{subnet.name}</b>: {subnet.description}\n' + \
+           f'\t id: <code>{subnet.id}</code>\n' + \
+           f'\t cidr: <code>{subnet.cidr}</code>\n' + \
+           f'\t vpc_id: <code>{subnet.vpc_id}</code>\n' + \
+           f'\t gateway ip: {subnet.gateway_ip}\n' + \
+           f'\t status: <b>{subnet.status}</b>\n'
+
+    return text
+
+
+def __create_subnets_keyboard(client, callbacktype):
+    request = ListSubnetsRequest()
+    response = client.list_subnets_async(request)
+    result = response.result()  # type: ListSubnetsResponse
+
+    builder = InlineKeyboardBuilder()
+
+    for subnet in result.subnets:
+        builder.button(
+            text=subnet.name,
+            callback_data=callbacktype(action='do', id=subnet.id),
+        )
+    builder.button(text='Назад', callback_data=callbacktype(
+        action='back', id='____'))
+
+    return builder.as_markup()
+
+
 @SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.LIST))
 async def subnet_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -167,41 +201,137 @@ async def subnet_list(call: CallbackQuery, state: FSMContext):
     response = client.list_subnets_async(request)
     result = response.result()  # type: ListSubnetsResponse
 
-    entries = []
-    for subnet in result.subnets:
-        entry = f'<b>{subnet.name}</b>\n' + \
-                f'\t id: <code>{subnet.id}</code>\n' + \
-                f'\t cidr: {subnet.cidr}\n' + \
-                f'\t description: {subnet.description}\n' + \
-                f'\t vpc_id: <code>{subnet.vpc_id}</code>\n'
-
-        entries.append(entry)
-
+    entries = [__subnet_to_str(sub) for sub in result.subnets]
     await call.message.answer('\n'.join(entries), parse_mode='html')
     await call.answer()
 
 
-class subnet_DeleteStates(StatesGroup):
+class SubnetShowCallback(CallbackData, prefix='subnet_show'):
+    action: str  # show or go back
+    id: str
+
+
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.SHOW))
+async def subnet_show_buttons(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+    await call.message.edit_text('Выбери subnet', reply_markup=__create_subnets_keyboard(client, SubnetShowCallback))
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetShowCallback.filter(F.action == 'back'))
+async def subnet_show_buttons_back(call: CallbackQuery):
+    await call.message.edit_text('Subnetworks', reply_markup=keyboard())
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetShowCallback.filter(F.action == 'show'))
+async def subnet_show_buttons_entry(call: CallbackQuery, state: FSMContext, callback_data: SubnetShowCallback):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    request = ShowSubnetRequest(subnet_id=callback_data.id)
+    response = client.show_subnet_async(request)
+    result = response.result()  # type: ShowSubnetResponse
+
+    await call.message.reply(__subnet_to_str(result.subnet), parse_mode='html')
+    await call.answer()
+
+
+class SubnetShowStates(StatesGroup):
+    ID = State()
+
+
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.SHOW_BY_ID))
+async def subnet_show_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи id сабнета')
+    await state.set_state(SubnetShowStates.ID)
+    await call.answer()
+
+
+@SUBNET.router.message(SubnetShowStates.ID)
+async def subnet_show(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    subnet_id = message.text
+    try:
+        request = ShowSubnetRequest(subnet_id=subnet_id)
+        response = client.show_subnet_async(request)
+        result = response.result()  # type: ShowSubnetResponse
+
+        await message.reply(__subnet_to_str(result.subnet), parse_mode='html')
+    except exceptions.ClientRequestException as exc:
+        await message.answer(exc.error_msg)
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
+    await state.set_state(GlobalState.DEFAULT)
+
+
+class SubnetDeleteCallback(CallbackData, prefix='subnet_delete'):
+    action: str
+    id: str
+
+
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.DELETE))
+async def vpc_delete(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+    await call.message.edit_text('Выбери VPC для удаления', reply_markup=__create_subnets_keyboard(client, SubnetDeleteCallback))
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetDeleteCallback.filter(F.action == 'do'))
+async def vpc_delete_entry(call: CallbackQuery, state: FSMContext, callback_data: SubnetDeleteCallback):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    try:
+        request = ShowSubnetRequest(subnet_id=callback_data.id)
+        response = client.show_subnet_async(request)
+        result = response.result()  # type: ShowSubnetResponse
+
+        request = DeleteSubnetRequest(
+            vpc_id=result.subnet.vpc_id, subnet_id=callback_data.id)
+        response = client.delete_subnet_async(request)
+        response.result()
+    except exceptions.ClientRequestException as exc:
+        await call.message.answer(exc.error_msg)
+        await call.answer()
+        return
+
+    await call.message.answer('Удалено')
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetDeleteCallback.filter(F.action == 'back'))
+async def vpc_delete_back(call: CallbackQuery):
+    await call.message.edit_text('Subnet', reply_markup=keyboard())
+    await call.answer()
+
+
+class SubnetDeleteStates(StatesGroup):
     SUBNET_ID = State()
     VPC_ID = State()
 
 
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.DELETE))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.DELETE_BY_ID))
 async def subnet_delete_subnet_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id сабнета')
-    await state.set_state(subnet_DeleteStates.SUBNET_ID)
+    await state.set_state(SubnetDeleteStates.SUBNET_ID)
     await call.answer()
 
 
-@SUBNET.router.message(subnet_DeleteStates.SUBNET_ID)
+@SUBNET.router.message(SubnetDeleteStates.SUBNET_ID)
 async def subnet_delete_vpc_id(message: types.Message, state: FSMContext):
     subnet_id = message.text
     await state.update_data(subnet_id=subnet_id)
     await message.answer('Введи id vpc')
-    await state.set_state(subnet_DeleteStates.VPC_ID)
+    await state.set_state(SubnetDeleteStates.VPC_ID)
 
 
-@SUBNET.router.message(subnet_DeleteStates.VPC_ID)
+@SUBNET.router.message(SubnetDeleteStates.VPC_ID)
 async def subnet_delete(message: types.Message, state: FSMContext):
     vpc_id = message.text
 
@@ -215,8 +345,6 @@ async def subnet_delete(message: types.Message, state: FSMContext):
         response.result()
     except exceptions.ClientRequestException as exc:
         await message.answer(exc.error_msg)
-
-        # TODO: ещё попытку
         await state.set_state(GlobalState.DEFAULT)
         return
 
@@ -224,82 +352,49 @@ async def subnet_delete(message: types.Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
 
-class subnet_ShowStates(StatesGroup):
-    ID = State()
-
-
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.SHOW))
-async def subnet_show_id(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введи id сабнета')
-    await state.set_state(subnet_ShowStates.ID)
-    await call.answer()
-
-
-@SUBNET.router.message(subnet_ShowStates.ID)
-async def subnet_show(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    client = data['client']  # type: VpcAsyncClient
-
-    subnet_id = message.text
-    try:
-        request = ShowSubnetRequest(subnet_id=subnet_id)
-        response = client.show_subnet_async(request)
-        result = response.result()  # type: ShowSubnetResponse
-
-        await message.reply(str(result))
-    except exceptions.ClientRequestException as exc:
-        await message.answer(exc.error_msg)
-
-        # TODO: ещё попытку
-        await state.set_state(GlobalState.DEFAULT)
-        return
-
-    await state.set_state(GlobalState.DEFAULT)
-
-
-class subnet_UpdateStates(StatesGroup):
+class SubnetUpdateStates(StatesGroup):
     SUBNET_ID = State()
     VPC_ID = State()
     NAME = State()
     DESCRIPTION = State()
 
 
-@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.UPDATE))
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.UPDATE_BY_ID))
 async def subnet_update_subnet_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи id сабнета')
-    await state.set_state(subnet_UpdateStates.SUBNET_ID)
+    await state.set_state(SubnetUpdateStates.SUBNET_ID)
     await call.answer()
 
 
-@SUBNET.router.message(subnet_UpdateStates.SUBNET_ID)
+@SUBNET.router.message(SubnetUpdateStates.SUBNET_ID)
 async def subnet_update_vpc_id(message: types.Message, state: FSMContext):
     subnet_id = message.text
     await state.update_data(subnet_id=subnet_id)
 
     await message.answer('Введи id vpc')
-    await state.set_state(subnet_UpdateStates.VPC_ID)
+    await state.set_state(SubnetUpdateStates.VPC_ID)
 
 
-@SUBNET.router.message(subnet_UpdateStates.VPC_ID)
+@SUBNET.router.message(SubnetUpdateStates.VPC_ID)
 async def subnet_update_name(message: types.Message, state: FSMContext):
     vpc_id = message.text
     await state.update_data(vpc_id=vpc_id)
 
     await message.answer('Введи новое имя')
-    await state.set_state(subnet_UpdateStates.NAME)
+    await state.set_state(SubnetUpdateStates.NAME)
 
 
-@SUBNET.router.message(subnet_UpdateStates.NAME)
+@SUBNET.router.message(SubnetUpdateStates.NAME)
 async def subnet_update_desc(message: types.Message, state: FSMContext):
     name = message.text
     await state.update_data(name=name)
 
     await message.answer('Введи новое описание')
-    await state.set_state(subnet_UpdateStates.DESCRIPTION)
+    await state.set_state(SubnetUpdateStates.DESCRIPTION)
 
 
-@SUBNET.router.message(subnet_UpdateStates.DESCRIPTION)
-async def subnet_update(message: types.Message, state: FSMContext):
+@SUBNET.router.message(SubnetUpdateStates.DESCRIPTION)
+async def subnet_update_by_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
 
@@ -322,11 +417,46 @@ async def subnet_update(message: types.Message, state: FSMContext):
             await state.set_state(GlobalState.DEFAULT)
             return
     except exceptions.ClientRequestException as exc:
+        await message.answer('Ошибка!')
         await message.answer(exc.error_msg)
-
-        # TODO: ещё попытку
         await state.set_state(GlobalState.DEFAULT)
         return
 
     await message.answer('Данные обновлены')
     await state.set_state(GlobalState.DEFAULT)
+
+
+class SubnetUpdateCallback(CallbackData, prefix='subnet_update'):
+    action: str
+    id: str
+
+
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.UPDATE))
+async def subnet_update(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+    await call.message.edit_text('Выбери Subnet для изменения', reply_markup=__create_subnets_keyboard(client, SubnetUpdateCallback))
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetUpdateCallback.filter(F.action == 'back'))
+async def subnet_update_back(call: CallbackQuery):
+    await call.message.edit_text('Subnet', reply_markup=keyboard())
+    await call.answer()
+
+
+@SUBNET.router.callback_query(SubnetUpdateCallback.filter(F.action == 'do'))
+async def subnet_update_entry(call: CallbackQuery, state: FSMContext, callback_data: SubnetUpdateCallback):
+    data = await state.get_data()
+    client = data['client']  # type: VpcAsyncClient
+
+    request = ShowSubnetRequest(subnet_id=callback_data.id)
+    response = client.show_subnet_async(request)
+    result = response.result()  # type: ShowSubnetResponse
+
+    await state.update_data(subnet_id=result.subnet.id)
+    await state.update_data(vpc_id=result.subnet.vpc_id)
+
+    await call.message.answer('Введите новое имя (ЭТО SUBNET)')
+    await call.answer()
+    await state.set_state(SubnetUpdateStates.NAME)
