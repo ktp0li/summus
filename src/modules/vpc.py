@@ -14,7 +14,7 @@ from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkvpc.v2 import VpcAsyncClient, ListVpcsRequest, ListVpcsResponse
 from huaweicloudsdkvpc.v2 import ShowVpcRequest, ShowVpcResponse
 from huaweicloudsdkvpc.v2 import CreateVpcRequest, CreateVpcOption, CreateVpcRequestBody, CreateVpcResponse
-from huaweicloudsdkvpc.v2 import DeleteVpcRequest, DeleteVpcResponse
+from huaweicloudsdkvpc.v2 import DeleteVpcRequest
 
 from src.module import Module
 from src.utils import add_exit_button
@@ -29,15 +29,10 @@ VPC = Module(
 class Action(str, Enum):
     AUTH = 'authorize'
     CREATE = 'create'
-    CREATE_SUBNET = 'create subnet'
     LIST = 'list'
-    LIST_SUBNET = 'list subnet'
     SHOW = 'show'
-    SHOW_SUBNET = 'show subnet'
-    EDIT = 'edit'
-    EDIT_SUBNET = 'edit subnet'
+    UPDATE = 'update'
     DELETE = 'delete'
-    DELETE_SUBNET = 'delete subnet'
     UNAUTH = 'unauthorize'
 
 
@@ -298,7 +293,7 @@ async def vpc_show(message: types.Message, state: FSMContext):
         await state.set_state(vpc_AuthStates.AUTHORIZED)
         return
 
-    await state.clear()
+    await state.set_state(vpc_AuthStates.AUTHORIZED)
 
 
 @VPC.router.callback_query(VpcCallback.filter(F.action.in_(list(Action))))
