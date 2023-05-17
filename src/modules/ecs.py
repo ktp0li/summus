@@ -26,7 +26,7 @@ ECS = Module(
 class Action(str, Enum):
     CREATE_PREPAID = 'create prepaid'
     LIST = 'list'
-    LSIT_FLAVORS = 'list flavors'
+    LIST_FLAVORS = 'list flavors'
     SHOW_FLAVOR = 'show flavors'
 
 class EcsCallback(CallbackData, prefix='ecs'):
@@ -114,7 +114,7 @@ async def ecs_list(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-@ECS.router.callback_query(EcsCallback.filter(F.action == Action.LSIT_FLAVORS))
+@ECS.router.callback_query(EcsCallback.filter(F.action == Action.LIST_FLAVORS))
 async def ecs_list_flavors(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']
