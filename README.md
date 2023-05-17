@@ -71,7 +71,7 @@ class Action(str, Enum):
     CREATE = 'create'
     LIST = 'list'
     SHOW = 'show'
-	<CUSTOM_ACTION> = '<CUSTOM_PRETTY_ACTION>'
+    <CUSTOM_ACTION> = '<CUSTOM_PRETTY_ACTION>'
 
 class <MODULE_SHORT_NAME>Callback(CallbackData, prefix='<MODULE_SHORT_NAME>'):
     action: Action
