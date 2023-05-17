@@ -143,7 +143,7 @@ modules = (EPS, VPC, SUBNET, NAT, ECS, <MODULE_SHORT_NAME>)
 
 ## Тестирование
 
-Для тестирования проекта используются библиотеки `pytest` и `aiogram-tests`
+Для тестирования проекта используются библиотеки `pytest`
 
 <details>
 	<summary>Переменные окружения для тестирования</summary>
