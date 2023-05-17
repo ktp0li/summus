@@ -24,6 +24,7 @@ def __build_menu() -> InlineKeyboardMarkup:
             text=module.name,
             callback_data=module.name,
         )
+    builder.button(text='Clear creds', callback_data='clear')
     builder.adjust(2)
 
     return builder.as_markup()
@@ -83,4 +84,10 @@ async def auth_account_id(message: Message, state: FSMContext):
 @START.router.callback_query(F.data == 'exit')
 async def exit_(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=__build_menu())
-    await call.answer()
+
+
+@START.router.callback_query(F.data == 'clear')
+async def clear_(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer('Привет! Для использования бота тебе нужно авторизироваться. Введи ak')
+    await state.set_state(CreditsState.AK)
