@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
@@ -80,14 +81,14 @@ class ImsCreateStates(StatesGroup):
 
 
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.CREATE))
-async def ims_создать(call: CallbackQuery, state: FSMContext):
+async def ims_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового образа диска')
     await state.set_state(ImsCreateStates.NAME)
     await call.answer()
 
 
 @IMS.router.message(ImsCreateStates.NAME)
-async def ims_создать_имя(message: types.Message, state: FSMContext):
+async def ims_create_name(message: types.Message, state: FSMContext):
     name = message.text
     await state.update_data(name=name)
     await message.answer('Введи instance_id машины, с которой будем делать образ')
@@ -95,7 +96,7 @@ async def ims_создать_имя(message: types.Message, state: FSMContext):
 
 
 @IMS.router.message(ImsCreateStates.INSTANCE_ID)
-async def ims_создать_инстанс_айди(message: types.Message, state: FSMContext):
+async def ims_create_instance_id(message: types.Message, state: FSMContext):
     instance_id = message.text
     await state.update_data(instance_id=instance_id)
     await message.answer('Введи описание образа диска')
@@ -103,7 +104,7 @@ async def ims_создать_инстанс_айди(message: types.Message, sta
 
 
 @IMS.router.message(ImsCreateStates.DESCRIPTION)
-async def ims_создать_нетворк_айди(message: types.Message, state: FSMContext):
+async def ims_create_network_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
     client = data['client']
     description = message.text
@@ -124,7 +125,7 @@ async def ims_создать_нетворк_айди(message: types.Message, sta
 
 
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.LIST))
-async def ims_лист(call: CallbackQuery, state: FSMContext):
+async def ims_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']
     try:
@@ -157,14 +158,14 @@ class ImsImportState(StatesGroup):
 
 
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.IMPORT))
-async def ims_импорт(call: CallbackQuery, state: FSMContext):
+async def ims_import(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для импортируемого образа диска')
     await state.set_state(ImsImportState.NAME)
     await call.answer()
 
 
 @IMS.router.message(ImsImportState.NAME)
-async def ims_импорт_имя(message: types.Message, state: FSMContext):
+async def ims_import_name(message: types.Message, state: FSMContext):
     name = message.text
     await state.update_data(name=name)
     await message.answer('Введи версию ОС образа')
@@ -172,7 +173,7 @@ async def ims_импорт_имя(message: types.Message, state: FSMContext):
 
 
 @IMS.router.message(ImsImportState.OS_VERSION)
-async def ims_импорт_ос_версион(message: types.Message, state: FSMContext):
+async def ims_import_os_version(message: types.Message, state: FSMContext):
     os_version = message.text
     await state.update_data(os_version=os_version)
     await message.answer('Введи минимальный размер диска образа (в гигах)')
@@ -180,7 +181,7 @@ async def ims_импорт_ос_версион(message: types.Message, state: FS
 
 
 @IMS.router.message(ImsImportState.MIN_DISK)
-async def ims_импорт_мин_диск(message: types.Message, state: FSMContext):
+async def ims_import_min_disk(message: types.Message, state: FSMContext):
     min_disk = message.text
     await state.update_data(min_disk=min_disk)
     await message.answer('Введи URL образа диска')
@@ -188,7 +189,7 @@ async def ims_импорт_мин_диск(message: types.Message, state: FSMCon
 
 
 @IMS.router.message(ImsImportState.IMAGE_URL)
-async def ims_импорт_имаге_юрл(message: types.Message, state: FSMContext):
+async def ims_import_image_url(message: types.Message, state: FSMContext):
     data = await state.get_data()
     image_url = await state.get_data()
     client = data['client']
