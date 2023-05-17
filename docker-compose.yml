@@ -1,0 +1,9 @@
+version: '3.1'
+
+services:
+  bot:
+    build:
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      TOKEN: '6253104009:AAE1-ypinN9H-k8z7ZZGwm-O2ZgEI-xyNLU'
