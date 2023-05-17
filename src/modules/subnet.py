@@ -197,13 +197,20 @@ async def subnet_list(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
 
-    request = ListSubnetsRequest()
-    response = client.list_subnets_async(request)
-    result = response.result()  # type: ListSubnetsResponse
+    try:
+        request = ListSubnetsRequest()
+        response = client.list_subnets_async(request)
+        result = response.result()  # type: ListSubnetsResponse
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await call.answer()
+        await state.set_state(GlobalState.DEFAULT)
+        return
 
     entries = [__subnet_to_str(sub) for sub in result.subnets]
     await call.message.answer('\n'.join(entries), parse_mode='html')
     await call.answer()
+
 
 
 class SubnetShowCallback(CallbackData, prefix='subnet_show'):
@@ -230,9 +237,15 @@ async def subnet_show_buttons_entry(call: CallbackQuery, state: FSMContext, call
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
 
-    request = ShowSubnetRequest(subnet_id=callback_data.id)
-    response = client.show_subnet_async(request)
-    result = response.result()  # type: ShowSubnetResponse
+    try:
+        request = ShowSubnetRequest(subnet_id=callback_data.id)
+        response = client.show_subnet_async(request)
+        result = response.result()  # type: ShowSubnetResponse
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await call.answer()
+        await state.set_state(GlobalState.DEFAULT)
+        return
 
     await call.message.reply(__subnet_to_str(result.subnet), parse_mode='html')
     await call.answer()
@@ -450,9 +463,15 @@ async def subnet_update_entry(call: CallbackQuery, state: FSMContext, callback_d
     data = await state.get_data()
     client = data['client']  # type: VpcAsyncClient
 
-    request = ShowSubnetRequest(subnet_id=callback_data.id)
-    response = client.show_subnet_async(request)
-    result = response.result()  # type: ShowSubnetResponse
+    try:
+        request = ShowSubnetRequest(subnet_id=callback_data.id)
+        response = client.show_subnet_async(request)
+        result = response.result()  # type: ShowSubnetResponse
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await call.answer()
+        await state.set_state(GlobalState.DEFAULT)
+        return
 
     await state.update_data(subnet_id=result.subnet.id)
     await state.update_data(vpc_id=result.subnet.vpc_id)
