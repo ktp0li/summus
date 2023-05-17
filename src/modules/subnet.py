@@ -21,6 +21,7 @@ from huaweicloudsdkvpc.v2 import UpdateSubnetOption, UpdateSubnetRequest, Update
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
+from src.modules.terraform import TerraformCreate
 
 ENDPOINT = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
 
@@ -112,10 +113,16 @@ async def subnet_create(call: CallbackQuery, state: FSMContext):
 @SUBNET.router.message(SubnetCreateStates.NAME)
 async def subnet_create_name(message: types.Message, state: FSMContext):
     name = message.text
-
-    await message.answer('Введи описание')
+    data = await state.get_data()
     await state.update_data(name=name)
-    await state.set_state(SubnetCreateStates.DESCRIPTION)
+
+    if not data['use_terraform']:
+        await message.answer('Введи описание')
+        await state.set_state(SubnetCreateStates.DESCRIPTION)
+    else:
+        await message.answer('введи CIDR')
+        await state.set_state(SubnetCreateStates.CIDR)
+
 
 
 @SUBNET.router.message(SubnetCreateStates.DESCRIPTION)
@@ -146,6 +153,8 @@ async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if data['use_terraform'] == True:
+        config = TerraformCreate().create_subnet(data['name'], data['cidr'], gateway_ip, vpc_id)
+        await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return
 
