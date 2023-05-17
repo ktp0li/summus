@@ -7,9 +7,12 @@ from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkvpc.v2 import *
 from huaweicloudsdkeps.v1 import (EpsAsyncClient)
 
+
 def test_bot(): Bot(token=os.getenv('TOKEN'))
 
-def test_modules(): assert(len(modules) >= 1)
+
+def test_modules(): assert (len(modules) >= 1)
+
 
 def test_auth_vpc():
     bot_token = os.getenv('TOKEN')
@@ -18,7 +21,7 @@ def test_auth_vpc():
     project_id = os.getenv('PROJECT_ID')
     account_id = os.getenv('ACCOUNT_ID')
     endpoint = 'https://vpc.ru-moscow-1.hc.sbercloud.ru'
-    assert(bot_token and ak and sk and project_id and account_id)
+    assert (bot_token and ak and sk and project_id and account_id)
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = True
     credentials = BasicCredentials(ak, sk, project_id)
@@ -32,6 +35,7 @@ def test_auth_vpc():
     request = ListVpcsRequest(limit=1)
     vpc_client.list_vpcs(request)
 
+
 def test_auth_eps():
     bot_token = os.getenv('TOKEN')
     ak = os.getenv('AK')
@@ -39,7 +43,7 @@ def test_auth_eps():
     project_id = os.getenv('PROJECT_ID')
     account_id = os.getenv('ACCOUNT_ID')
     endpoint = 'https://eps.ru-moscow-1.hc.sbercloud.ru'
-    assert(bot_token and ak and sk and project_id and account_id)
+    assert (bot_token and ak and sk and project_id and account_id)
     config = HttpConfig.get_default_config()
     config.ignore_ssl_verification = True
     credentials = GlobalCredentials(ak, sk, domain_id=account_id)

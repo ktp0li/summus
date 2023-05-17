@@ -101,6 +101,7 @@ async def nat_create_terraform(call: CallbackQuery, state: FSMContext):
     await state.set_state(NatCreateStates.NAME)
     await call.answer()
 
+
 @NAT.router.callback_query(NatCallback.filter(F.action == Action.CREATE))
 async def nat_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового NAT')

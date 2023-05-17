@@ -86,6 +86,7 @@ class EcsCreateStates(StatesGroup):
     VPC_ID = State()
     SUBNET_ID = State()
 
+
 @ECS.router.callback_query(EcsCallback.filter(F.action == Action.CREATE_PREPAID_TERRAFORM))
 async def ecs_create_terraform(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для новой виртуальной машины')

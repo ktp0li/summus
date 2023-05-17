@@ -80,6 +80,7 @@ class ImsCreateStates(StatesGroup):
     INSTANCE_ID = State()
     DESCRIPTION = State()
 
+
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.CREATE_TERRAFORM))
 async def ims_create_terraform(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового образа диска')

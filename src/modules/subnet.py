@@ -92,12 +92,14 @@ class SubnetCreateStates(StatesGroup):
     CIDR = State()
     VPC_ID = State()
 
+
 @SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.CREATE_TERRAFORM))
 async def subnet_create_terraform(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового сабнета')
     await state.update_data(use_terraform=True)
     await state.set_state(SubnetCreateStates.NAME)
     await call.answer()
+
 
 @SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.CREATE))
 async def subnet_create(call: CallbackQuery, state: FSMContext):
@@ -223,7 +225,6 @@ async def subnet_list(call: CallbackQuery, state: FSMContext):
     entries = [__subnet_to_str(sub) for sub in result.subnets]
     await call.message.answer('\n'.join(entries), parse_mode='html')
     await call.answer()
-
 
 
 class SubnetShowCallback(CallbackData, prefix='subnet_show'):

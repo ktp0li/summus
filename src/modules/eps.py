@@ -91,13 +91,13 @@ class EpsCreateStates(StatesGroup):
     NAME = State()
     DESCRIPTION = State()
 
+
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.CREATE_TERRAFORM))
 async def eps_create_terraform(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового проекта')
     await state.update_data(use_terraform=True)
     await state.set_state(EpsCreateStates.NAME)
     await call.answer()
-
 
 
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.CREATE))
@@ -427,6 +427,7 @@ async def eps_update(call: CallbackQuery, state: FSMContext):
 class EpsShowResources(StatesGroup):
     PROJECT_ID = State()
 
+
 def __resource_to_str(resource) -> str:
     text = f'resource: <b>{resource.resource_name}</b>:\n' + \
         f'\t resource id: <code>{resource.resource_id}</code>\n' + \
@@ -434,11 +435,13 @@ def __resource_to_str(resource) -> str:
 
     return text
 
+
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.SHOW_RESOURCES))
 async def eps_show_resources_project_id(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи айди энтерпрайз проекта, ресурсы которого хочешь получить')
     await state.set_state(EpsShowResources.PROJECT_ID)
     await call.answer()
+
 
 @EPS.router.message(EpsShowResources.PROJECT_ID)
 async def eps_show_resources(message: types.Message, state: FSMContext):
@@ -449,8 +452,9 @@ async def eps_show_resources(message: types.Message, state: FSMContext):
 
     try:
         request = ShowResourceBindEnterpriseProjectRequest(
-                                enterprise_project_id=enterprise_project_id)
-        request.body = ResqEpResouce(resource_types=['ecs', 'vpcs', 'images', 'disk'], projects=[project_id])
+            enterprise_project_id=enterprise_project_id)
+        request.body = ResqEpResouce(
+            resource_types=['ecs', 'vpcs', 'images', 'disk'], projects=[project_id])
         response = client.show_resource_bind_enterprise_project_async(request)
         result = response.result()
     except exceptions.ClientRequestException as e:
@@ -461,7 +465,6 @@ async def eps_show_resources(message: types.Message, state: FSMContext):
     if not res_list:
         res_list = 'resources: None'
     await message.answer(res_list, parse_mode='html')
-
 
 
 @EPS.router.callback_query(EpsUpdateCallback.filter(F.action == 'do'))
