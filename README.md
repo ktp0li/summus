@@ -28,8 +28,21 @@ python3 -m src
 - Enterprise Management
 - NAT Gateway
 - Virtual Private Cloud
+- Subnet
 
 ## Roadmap
+
+- [x] Создать минимального бота с базовыми возможностями управления ресурсами:
+- - [x] ESC
+- - [x] EPS
+- - [x] NAT
+- - [x] VPC
+- - [x] Subnet
+- [x] Написать несколько тестов, которые покроют базовые аспекты работы бота
+------
+- [ ] Покрыть ботом больше сервисов ~~Sber~~Cloud
+- [ ] Сделать более удобную систему авторизации
+- [ ] Сделать более user-friendly интерфейс (предоставлять опцию выбора ресурса из имеющихся, когда есть возможность)
 
 
 ## Документация
@@ -89,12 +102,6 @@ def keyboard() -> InlineKeyboardMarkup:
 # Действие модуля
 @<MODULE_SHORT_NAME>.router.callback_query(<MODULE_SHORT_NAME>Callback.filter(F.action == Action.<CUSTOM_ACTION>))
 async def CUSTOM_ACTION(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Hello, world!')
-    await call.answer()
-
-# Действие модуля
-@<MODULE_SHORT_NAME>.router.callback_query(<MODULE_SHORT_NAME>Callback.filter(F.action == Action.<CUSTOM_ACTION>))
-async def <CUSTOM_ACTION>(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Hello, world!')
     await call.answer()
 ```
