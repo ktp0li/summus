@@ -116,14 +116,6 @@ async def ims_создать_нетворк_айди(message: types.Message, sta
     await message.answer('Образ создается')
     await state.set_state(GlobalState.DEFAULT)
 
-def __ims_to_str(ims) -> str:
-    text = f'<b>{ims.name}</b>:\n' + \
-        f'\t id: <code>{ims.id}</code>\n' + \
-        f'\t flavor: <code>{ims.flavor}</code>\n' + \
-        f'\t status: <b>{ims.status}</b>\n'
-
-    return text
-
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.LIST))
 async def ims_лист(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
