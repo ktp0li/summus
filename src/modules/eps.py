@@ -439,7 +439,7 @@ async def eps_show_resources(message: types.Message, state: FSMContext):
         response = client.show_resource_bind_enterprise_project_async(request)
         result = response.result()
     except exceptions.ClientRequestException as e:
-        await call.message.answer(e.error_msg)
+        await message.answer(e.error_msg)
         await state.set_state(GlobalState.DEFAULT)
         return
     res_list = '\n'.join([__resource_to_str(i) for i in result.resources])
