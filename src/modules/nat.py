@@ -31,6 +31,7 @@ NAT = Module(
 
 class Action(str, Enum):
     CREATE = 'create'
+    CREATE_TERRAFORM = 'create terraform'
     LIST = 'list'
     SHOW = 'show'
     UPDATE = 'update'
@@ -93,9 +94,17 @@ class NatCreateStates(StatesGroup):
     ENTERPRISE_PROJECT_ID = State()
 
 
+@NAT.router.callback_query(NatCallback.filter(F.action == Action.CREATE_TERRAFORM))
+async def nat_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового NAT')
+    await state.update_data(use_terraform=True)
+    await state.set_state(NatCreateStates.NAME)
+    await call.answer()
+
 @NAT.router.callback_query(NatCallback.filter(F.action == Action.CREATE))
 async def nat_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового NAT')
+    await state.update_data(use_terraform=False)
     await state.set_state(NatCreateStates.NAME)
     await call.answer()
 
@@ -150,6 +159,11 @@ async def nat_create_projid(message: types.Message, state: FSMContext):
     enterprise_project_id = message.text
 
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']  # type: NatAsyncClient
 
     try:

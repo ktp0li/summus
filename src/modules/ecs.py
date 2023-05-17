@@ -28,6 +28,7 @@ ECS = Module(
 
 class Action(str, Enum):
     CREATE_PREPAID = 'create prepaid'
+    CREATE_PREPAID_TERRAFORM = 'create prepaid terraform'
     LIST = 'list'
     SHOW = 'show'
     LIST_FLAVORS = 'list flavors'
@@ -85,10 +86,18 @@ class EcsCreateStates(StatesGroup):
     VPC_ID = State()
     SUBNET_ID = State()
 
+@ECS.router.callback_query(EcsCallback.filter(F.action == Action.CREATE_PREPAID_TERRAFORM))
+async def ecs_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для новой виртуальной машины')
+    await state.update_data(use_terraform=True)
+    await state.set_state(EcsCreateStates.NAME)
+    await call.answer()
+
 
 @ECS.router.callback_query(EcsCallback.filter(F.action == Action.CREATE_PREPAID))
 async def ecs_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для новой виртуальной машины')
+    await state.update_data(use_terraform=False)
     await state.set_state(EcsCreateStates.NAME)
     await call.answer()
 
@@ -128,6 +137,11 @@ async def ecs_create_vpc_id(message: types.Message, state: FSMContext):
 @ECS.router.message(EcsCreateStates.SUBNET_ID)
 async def ecs_create_network_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']
     subnet_id = message.text
     try:

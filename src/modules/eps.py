@@ -31,6 +31,7 @@ EPS = Module(
 
 class Action(str, Enum):
     CREATE = 'create'
+    CREATE_TERRAFORM = 'create terraform'
     LIST = 'list'
     SHOW_PROJECT = 'show project'
     SHOW_RESOURCES = 'show resources'
@@ -90,10 +91,19 @@ class EpsCreateStates(StatesGroup):
     NAME = State()
     DESCRIPTION = State()
 
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.CREATE_TERRAFORM))
+async def eps_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового проекта')
+    await state.update_data(use_terraform=True)
+    await state.set_state(EpsCreateStates.NAME)
+    await call.answer()
+
+
 
 @EPS.router.callback_query(EpsCallback.filter(F.action == Action.CREATE))
 async def eps_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового проекта')
+    await state.update_data(use_terraform=False)
     await state.set_state(EpsCreateStates.NAME)
     await call.answer()
 
@@ -112,6 +122,11 @@ async def eps_create_desc(message: types.Message, state: FSMContext):
     description = message.text
 
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']
 
     try:

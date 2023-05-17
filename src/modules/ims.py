@@ -27,6 +27,7 @@ IMS = Module(
 
 class Action(str, Enum):
     CREATE = 'create'
+    CREATE_TERRAFORM = 'create terraform'
     LIST = 'list'
     IMPORT = 'import'
 
@@ -79,10 +80,18 @@ class ImsCreateStates(StatesGroup):
     INSTANCE_ID = State()
     DESCRIPTION = State()
 
+@IMS.router.callback_query(ImsCallback.filter(F.action == Action.CREATE_TERRAFORM))
+async def ims_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового образа диска')
+    await state.update_data(use_terraform=True)
+    await state.set_state(ImsCreateStates.NAME)
+    await call.answer()
+
 
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.CREATE))
 async def ims_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового образа диска')
+    await state.update_data(use_terraform=False)
     await state.set_state(ImsCreateStates.NAME)
     await call.answer()
 
@@ -106,6 +115,11 @@ async def ims_create_instance_id(message: types.Message, state: FSMContext):
 @IMS.router.message(ImsCreateStates.DESCRIPTION)
 async def ims_create_network_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']
     description = message.text
     try:
@@ -142,8 +156,8 @@ async def ims_list(call: CallbackQuery, state: FSMContext):
             messag += '\n'
         await call.message.answer(messag, parse_mode='markdown')
     except exceptions.ClientRequestException as e:
-        await message.answer('Не вышло :(')
-        await message.answer(e.error_msg)
+        await call.message.answer('Не вышло :(')
+        await call.message.answer(e.error_msg)
         await state.set_state(GlobalState.DEFAULT)
         return
 

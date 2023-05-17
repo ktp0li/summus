@@ -31,6 +31,7 @@ VPC = Module(
 
 class Action(str, Enum):
     CREATE = 'create'
+    CREATE_TERRAFORM = 'create terraform'
     LIST = 'list'
     SHOW = 'show'
     SHOW_BY_ID = 'show by id'
@@ -91,9 +92,18 @@ class VpcCreateStates(StatesGroup):
     ENTERPRISE_PROJECT_ID = State()
 
 
+@VPC.router.callback_query(VpcCallback.filter(F.action == Action.CREATE_TERRAFORM))
+async def vpc_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового vpc')
+    await state.update_data(use_terraform=True)
+    await state.set_state(VpcCreateStates.NAME)
+    await call.answer()
+
+
 @VPC.router.callback_query(VpcCallback.filter(F.action == Action.CREATE))
 async def vpc_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового vpc')
+    await state.update_data(use_terraform=False)
     await state.set_state(VpcCreateStates.NAME)
     await call.answer()
 
@@ -130,6 +140,11 @@ async def vpc_create_projid(message: types.Message, state: FSMContext):
     enterprise_project_id = message.text
 
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']  # type: VpcAsyncClient
 
     try:

@@ -32,6 +32,7 @@ SUBNET = Module(
 
 class Action(str, Enum):
     CREATE = 'create'
+    CREATE_TERRAFORM = 'create terraform'
     LIST = 'list'
     SHOW_BY_ID = 'show by id'
     SHOW = 'show'
@@ -91,10 +92,17 @@ class SubnetCreateStates(StatesGroup):
     CIDR = State()
     VPC_ID = State()
 
+@SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.CREATE_TERRAFORM))
+async def subnet_create_terraform(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи имя для нового сабнета')
+    await state.update_data(use_terraform=True)
+    await state.set_state(SubnetCreateStates.NAME)
+    await call.answer()
 
 @SUBNET.router.callback_query(SubnetCallback.filter(F.action == Action.CREATE))
 async def subnet_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового сабнета')
+    await state.update_data(use_terraform=False)
     await state.set_state(SubnetCreateStates.NAME)
     await call.answer()
 
@@ -134,6 +142,11 @@ async def subnet_create_vpc_id(message: types.Message, state: FSMContext):
     gateway_ip = '10.0.0.1'
 
     data = await state.get_data()
+
+    if data['use_terraform'] == True:
+        await state.set_state(GlobalState.DEFAULT)
+        return
+
     client = data['client']  # type: VpcAsyncClient
 
     try:
