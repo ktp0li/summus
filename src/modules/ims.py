@@ -129,5 +129,4 @@ def __ims_to_str(ims) -> str:
 async def ims_list(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для нового образа диска')
     
-
     await call.answer()

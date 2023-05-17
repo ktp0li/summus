@@ -30,6 +30,7 @@ python3 -m src
 - NAT Gateway
 - Virtual Private Cloud
 - Subnet
+- Image Management Service
 
 ## Roadmap
 
@@ -38,6 +39,7 @@ python3 -m src
 - - [x] EPS
 - - [x] NAT
 - - [x] VPC
+- - [x] IMS
 - - [x] Subnet
 - [x] Написать несколько тестов, которые покроют базовые аспекты работы бота
 ------
