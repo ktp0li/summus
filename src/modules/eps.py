@@ -14,7 +14,8 @@ from huaweicloudsdkeps.v1 import (EpsAsyncClient, ListEnterpriseProjectRequest,
                                   CreateEnterpriseProjectRequest, EnterpriseProject,
                                   EnableEnterpriseProjectRequest, DisableAction,
                                   DisableEnterpriseProjectRequest, UpdateEnterpriseProjectRequest,
-                                  ShowEnterpriseProjectRequest)
+                                  ShowEnterpriseProjectRequest, ShowResourceBindEnterpriseProjectRequest,
+                                  ResqEpResouce)
 
 from src.module import Module
 from src.utils import add_exit_button
@@ -31,7 +32,8 @@ EPS = Module(
 class Action(str, Enum):
     CREATE = 'create'
     LIST = 'list'
-    SHOW = 'show'
+    SHOW_PROJECT = 'show project'
+    SHOW_RESOURCES = 'show resources'
     UPDATE = 'update'
     ENABLE = 'enable'
     DISABLE = 'disable'
@@ -157,7 +159,7 @@ class EpsShowCallback(CallbackData, prefix='eps_show'):
     id: str
 
 
-@EPS.router.callback_query(EpsCallback.filter(F.action == Action.SHOW))
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.SHOW_PROJECT))
 async def eps_show_buttons(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     client = data['client']  # type: EpsAsyncClient
@@ -405,6 +407,46 @@ async def eps_update(call: CallbackQuery, state: FSMContext):
     client = data['client']  # type: EpsAsyncClient
     await call.message.edit_text('Выбери EPS для изменения', reply_markup=__create_epss_keyboard(client, EpsUpdateCallback))
     await call.answer()
+
+
+class EpsShowResources(StatesGroup):
+    PROJECT_ID = State()
+
+def __resource_to_str(resource) -> str:
+    text = f'resource: <b>{resource.resource_name}</b>:\n' + \
+        f'\t resource id: <code>{resource.resource_id}</code>\n' + \
+        f'\t resouce type: {resource.resource_type}\n'
+
+    return text
+
+@EPS.router.callback_query(EpsCallback.filter(F.action == Action.SHOW_RESOURCES))
+async def eps_show_resources_project_id(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Введи айди энтерпрайз проекта, ресурсы которого хочешь получить')
+    await state.set_state(EpsShowResources.PROJECT_ID)
+    await call.answer()
+
+@EPS.router.message(EpsShowResources.PROJECT_ID)
+async def eps_show_resources(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']
+    enterprise_project_id = message.text
+    project_id = data['project_id']
+
+    try:
+        request = ShowResourceBindEnterpriseProjectRequest(
+                                enterprise_project_id=enterprise_project_id)
+        request.body = ResqEpResouce(resource_types=['ecs', 'vpcs', 'images', 'disk'], projects=[project_id])
+        response = client.show_resource_bind_enterprise_project_async(request)
+        result = response.result()
+    except exceptions.ClientRequestException as e:
+        await call.message.answer(e.error_msg)
+        await state.set_state(GlobalState.DEFAULT)
+        return
+    res_list = '\n'.join([__resource_to_str(i) for i in result.resources])
+    if not res_list:
+        res_list = 'resources: None'
+    await message.answer(res_list, parse_mode='html')
+
 
 
 @EPS.router.callback_query(EpsUpdateCallback.filter(F.action == 'do'))
