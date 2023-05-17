@@ -7,14 +7,15 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.filters.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
-from src.module import Module
-from src.utils import add_exit_button
-from src.globalstate import GlobalState
-
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
-from huaweicloudsdkecs.v2 import(EcsAsyncClient, ListServersDetailsRequest, ListFlavorsRequest)
+from huaweicloudsdkecs.v2 import(EcsAsyncClient, ListServersDetailsRequest, ListFlavorsRequest, CreateServersRequest,
+                                 CreateServersRequestBody, PrePaidServer, PrePaidServerRootVolume, PrePaidServerNic)
+
+from src.module import Module
+from src.utils import add_exit_button
+from src.globalstate import GlobalState
 
 ENDPOINT = 'https://ecs.ru-moscow-1.hc.sbercloud.ru'
 
@@ -77,8 +78,7 @@ class EcsCreateStates(StatesGroup):
     NAME = State()
     FLAVOR = State()
     IMAGE_ID = State()
-    ROOT_VOL_TYPE = State()
-    ecs_ID = State()
+    VPC_ID = State()
     SUBNET_ID = State()
 
 @ECS.router.callback_query(EcsCallback.filter(F.action == Action.CREATE_PREPAID))
@@ -86,6 +86,59 @@ async def ecs_create(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Введи имя для новой виртуальной машины')
     await state.set_state(EcsCreateStates.NAME)
     await call.answer()
+
+@ECS.router.message(EcsCreateStates.NAME)
+async def ecs_create_name(message: types.Message, state: FSMContext):
+    name = message.text
+    await state.update_data(name=name)
+    await message.answer('Введи flavor новой виртуальной машины')
+    await state.set_state(EcsCreateStates.FLAVOR)
+
+@ECS.router.message(EcsCreateStates.FLAVOR)
+async def ecs_create_flavor(message: types.Message, state: FSMContext):
+    flavor = message.text
+    await state.update_data(flavor=flavor)
+    await message.answer('Введи айди образа для новой виртуальной машины')
+    await state.set_state(EcsCreateStates.IMAGE_ID)
+
+@ECS.router.message(EcsCreateStates.IMAGE_ID)
+async def ecs_create_image_id(message: types.Message, state: FSMContext):
+    image_id = message.text
+    await state.update_data(image_id=image_id)
+    await message.answer('Введи айди vpc для новой виртуальной машины')
+    await state.set_state(EcsCreateStates.VPC_ID)
+
+@ECS.router.message(EcsCreateStates.VPC_ID)
+async def ecs_create_vpc_id(message: types.Message, state: FSMContext):
+    vpc_id = message.text
+    await state.update_data(vpc_id=vpc_id)
+    await message.answer('Введи айди subnet для nic-интерфейса новой виртуальной машины')
+    await state.set_state(EcsCreateStates.SUBNET_ID)
+
+@ECS.router.message(EcsCreateStates.SUBNET_ID)
+async def ecs_create_network_id(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    client = data['client']
+    subnet_id = message.text
+    try:
+        request = CreateServersRequest()
+        root_volume = PrePaidServerRootVolume(volumetype='SSD')
+        nic = PrePaidServerNic(subnet_id=subnet_id)
+        server = PrePaidServer(image_ref=data['image_id'], flavor_ref=data['flavor'],
+                               name=data['name'], vpcid=data['vpc_id'],
+                               root_volume=root_volume, nics=[nic])
+        request.body = CreateServersRequestBody(server=server)
+        response = client.create_servers_async(request)
+        response.result()
+    except exceptions.ClientRequestException as e:
+        await message.answer(e.error_msg)
+        await state.set_state(GlobalState.DEFAULT)
+        return
+    
+    await message.answer('Виртуальная машина создается')
+    await state.set_state(GlobalState.DEFAULT)
+
+
 
 
 def __ecs_to_str(ecs) -> str:
