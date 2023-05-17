@@ -17,7 +17,7 @@ from huaweicloudsdkvpc.v2 import CreateVpcRequest, CreateVpcOption, CreateVpcReq
 from huaweicloudsdkvpc.v2 import UpdateVpcOption, UpdateVpcRequestBody, UpdateVpcRequest, UpdateVpcResponse
 from huaweicloudsdkvpc.v2 import DeleteVpcRequest
 
-from src.modules.terraform import TerraformCreate
+from src.terraform import TerraformCreate
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
@@ -144,7 +144,7 @@ async def vpc_create_projid(message: types.Message, state: FSMContext):
 
     if data['use_terraform'] == True:
         config = TerraformCreate().create_vpc(data['name'], data['cidr'],
-                    data['description'], enterprise_project_id)
+                                              data['description'], enterprise_project_id)
         await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return

@@ -20,7 +20,7 @@ from huaweicloudsdkeps.v1 import (EpsAsyncClient, ListEnterpriseProjectRequest,
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
-from src.modules.terraform import TerraformCreate
+from src.terraform import TerraformCreate
 
 ENDPOINT = 'https://eps.ru-moscow-1.hc.sbercloud.ru'
 
@@ -125,7 +125,8 @@ async def eps_create_desc(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if data['use_terraform'] == True:
-        config = TerraformCreate().create_enterprise_project(data['name'], description)
+        config = TerraformCreate().create_enterprise_project(
+            data['name'], description)
         await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return

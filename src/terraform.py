@@ -21,6 +21,22 @@ class TerraformCreate:
                f'\tdescription = "{desc}"\n' +\
                '}'
 
+    def create_ecs(self, name, flavor, image_id, subnet_id):
+        return f'resource "sbercloud_compute_instance" "{name}" {{\n' +\
+               f'\tname = "{name}"\n' +\
+               f'\tflavor_id = "{flavor}"\n' +\
+               f'\timage_id = "{image_id}"\n' +\
+               '\tnetwork {\n' + \
+               f'\t\tuuid = "{subnet_id}"\n' +\
+               '\t}\n' +\
+               '}'
+
+    def create_image(self, name, instance_id):
+        return f'resource "sbercloud_images_image" "{name}" {{\n' +\
+               f'\tname = "{name}"\n' +\
+               f'\towner = "{instance_id}"\n' +\
+               '}'
+
     def create_nat_gateway(self, name, desc, spec, router_id, internal_network_id, proj_id):
         return f'resource "sbercloud_nat_gateway" "{name}" {{\n' +\
                f'\tname = "{name}"\n' +\
