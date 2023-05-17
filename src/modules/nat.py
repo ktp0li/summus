@@ -132,7 +132,7 @@ async def nat_create_router_id(message: types.Message, state: FSMContext):
     router_id = message.text
 
     await state.update_data(router_id=router_id)
-    await message.answer('введи spec (1, 2, 3, 4)')
+    await message.answer('Введи spec (1 (small), 2 (medium), 3 (large), 4 (extra-large))')
     await state.set_state(NatCreateStates.SPEC)
 
 
