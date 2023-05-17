@@ -20,3 +20,13 @@ class TerraformCreate:
                f'\tname = "{name}"\n' +\
                f'\tdescription = "{desc}"\n' +\
                '}'
+
+    def create_nat_gateway(self, name, desc, spec, router_id, internal_network_id, proj_id):
+        return f'resource "sbercloud_nat_gateway" "{name}" {{\n' +\
+               f'\tname = "{name}"\n' +\
+               f'\tdescription = "{desc}"\n' +\
+               f'\tspec = "{spec}"\n' +\
+               f'\trouter_id = "{router_id}"\n' +\
+               f'\tinternal_network_id = "{internal_network_id}"\n' +\
+               f'\tenterprise_project_id = "{proj_id}"\n' +\
+               '}'
