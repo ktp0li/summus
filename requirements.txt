@@ -1,2 +1,8 @@
 aiogram==3.0.0b7
-src
+huaweicloudsdkcore
+huaweicloudsdkecs
+huaweicloudsdkeps
+huaweicloudsdknat
+huaweicloudsdkvpc
+pytest
+aiogram-tests

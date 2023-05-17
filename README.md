@@ -29,10 +29,6 @@ python3 -m src
 - NAT Gateway
 - Virtual Private Cloud
 
-## Скриншоты
-
-
-
 ## Roadmap
 
 
@@ -121,6 +117,27 @@ modules = (EPS, VPC, SUBNET, NAT, ECS, <MODULE_SHORT_NAME>)
 ![Screenshot of example module](/img/module_example.jpeg)
 
 Пример взаимодействия с SDK см. в [src/modules](/src/modules)
+
+## Тестирование
+
+Для тестирования проекта используются библиотеки `pytest` и `aiogram-tests`
+
+<details>
+	<summary>Переменные окружения для тестирования</summary>
+
+- `TOKEN` - токен Telegram бота
+- `AK` - Access Key Id
+- `SK` - Secret Access Key
+- `PROJECT_ID`
+- `ACCOUNT_ID`
+
+</details>
+
+```bash
+pytest src/test.py
+```
+
+--------
 
 ## К проекту приложили руки
 
