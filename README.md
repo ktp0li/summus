@@ -1,4 +1,4 @@
-# summus
+# summus [![summus_sbercloud_bot.t.me](https://img.shields.io/badge/Telegram-Bot-blue)](summus_sbercloud_bot.t.me)
 
 > summus - от лат. высочайний, верховный
 
