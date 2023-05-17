@@ -36,6 +36,7 @@ python3 -m src
 - Virtual Private Cloud
 - Subnet
 - Image Management Service
+- Cloud Eye
 
 ## Roadmap
 
