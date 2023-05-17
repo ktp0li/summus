@@ -40,7 +40,7 @@ class CreditsState(StatesGroup):
 @START.router.message(GlobalState.DEFAULT, CommandStart())
 async def main_authorized(message: Message):
     await message.answer(
-        "白哥你好", reply_markup=__build_menu()
+        "Выбирай ресурс для взаимодействия :)", reply_markup=__build_menu()
     )
 
 
@@ -77,7 +77,7 @@ async def auth_account_id(message: Message, state: FSMContext):
     await state.set_state(GlobalState.DEFAULT)
 
     await message.answer(
-        "白哥你好", reply_markup=__build_menu()
+        "Выбирай ресурс для взаимодействия :)", reply_markup=__build_menu()
     )
 
 
