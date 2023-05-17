@@ -6,4 +6,4 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      TOKEN: '6253104009:AAE1-ypinN9H-k8z7ZZGwm-O2ZgEI-xyNLU'
+      TOKEN: ''
