@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
@@ -127,6 +128,16 @@ def __ims_to_str(ims) -> str:
 
 @IMS.router.callback_query(ImsCallback.filter(F.action == Action.LIST))
 async def ims_list(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Введи имя для нового образа диска')
+    client = data['client']
+    try:
+        request = ListImagesRequest()
+        response = client.list_images_async(request)
+        response = json.dump(response)
+        print(response)
+    except exceptions.ClientRequestException as e:
+        await message.answer('Не вышло :(')
+        await message.answer(e.error_msg)
+        await state.set_state(GlobalState.DEFAULT)
+        return
     
     await call.answer()

@@ -4,4 +4,6 @@ huaweicloudsdkecs
 huaweicloudsdkeps
 huaweicloudsdknat
 huaweicloudsdkvpc
+huaweicloudsdkces
+huaweicloudsdkims
 pytest
