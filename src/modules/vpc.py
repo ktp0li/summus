@@ -426,5 +426,5 @@ async def vpc_update_entry(call: CallbackQuery, state: FSMContext, callback_data
 
 @VPC.router.callback_query(VpcDeleteCallback.filter(F.action == 'back'))
 async def vpc_update_back(call: CallbackQuery):
-    await call.message.edit_text('Virtal Private Cloud', reply_markup=keyboard())
+    await call.message.edit_text('Virtual Private Cloud', reply_markup=keyboard())
     await call.answer()
