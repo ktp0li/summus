@@ -1,9 +1,8 @@
 from src.modules import modules
 import os
 
-from aiogram import Dispatcher, Bot
+from aiogram import Bot
 from huaweicloudsdkcore.auth.credentials import BasicCredentials, GlobalCredentials
-from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkcore.http.http_config import HttpConfig
 from huaweicloudsdkvpc.v2 import *
 from huaweicloudsdkeps.v1 import (EpsAsyncClient)
@@ -31,7 +30,7 @@ def test_auth_vpc():
         .build()
 
     request = ListVpcsRequest(limit=1)
-    response = vpc_client.list_vpcs(request)
+    vpc_client.list_vpcs(request)
 
 def test_auth_eps():
     bot_token = os.getenv('TOKEN')
@@ -52,4 +51,4 @@ def test_auth_eps():
         .build()
 
     request = ListVpcsRequest(limit=1)
-    response = eps_client.list_enterprise_project_async(request)
+    eps_client.list_enterprise_project_async(request)
