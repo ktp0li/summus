@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 
-from aiogram import Dispatcher, Bot
+from aiogram import Dispatcher, Bot, types
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.modules import modules
@@ -22,6 +22,11 @@ def create_dispatcher() -> Dispatcher:
 
 async def main():
     bot = Bot(token=os.getenv('TOKEN'))
+    await bot.set_my_commands(
+        commands=[types.BotCommand(
+            command='start', description='Главное меню бота')]
+    )
+
     dispatcher = create_dispatcher()
     logging.basicConfig(level=logging.INFO)
 
