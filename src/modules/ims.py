@@ -16,6 +16,7 @@ from huaweicloudsdkims.v2 import *
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
+from ..terraform import TerraformCreate
 
 ENDPOINT = 'https://ims.ru-moscow-1.hc.sbercloud.ru'
 
@@ -118,6 +119,11 @@ async def ims_create_network_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if data['use_terraform'] == True:
+        config = TerraformCreate().create_image(
+            name=data['name'],
+            instance_id=data['instance_id']
+        )
+        await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return
 

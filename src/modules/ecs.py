@@ -17,6 +17,7 @@ from huaweicloudsdkecs.v2 import (EcsAsyncClient, ListServersDetailsRequest, Lis
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
+from ..terraform import TerraformCreate
 
 ENDPOINT = 'https://ecs.ru-moscow-1.hc.sbercloud.ru'
 
@@ -138,13 +139,20 @@ async def ecs_create_vpc_id(message: types.Message, state: FSMContext):
 @ECS.router.message(EcsCreateStates.SUBNET_ID)
 async def ecs_create_network_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    subnet_id = message.text
 
     if data['use_terraform'] == True:
+        config = TerraformCreate().create_ecs(
+            name=data['name'],
+            flavor=data['flavor'],
+            subnet_id=subnet_id,
+            image_id=data['image_id']
+        )
+        await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return
 
     client = data['client']
-    subnet_id = message.text
     try:
         request = CreateServersRequest()
         root_volume = PrePaidServerRootVolume(volumetype='SSD')

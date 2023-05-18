@@ -1,6 +1,8 @@
+# [Видео демонстрация](https://disk.yandex.ru/d/1JAxIfjOWdnrXQ/video%20demo.mp4)
 # summus [![summus_sbercloud_bot.t.me](https://img.shields.io/badge/Telegram-Bot-blue)](https://summus_sbercloud_bot.t.me)
 
 > summus - от лат. высочайний, верховный
+
 
 ## Что это?
 
@@ -34,6 +36,7 @@ python3 -m src
 - Virtual Private Cloud
 - Subnet
 - Image Management Service
+- Cloud Eye
 
 ## Roadmap
 
@@ -58,7 +61,7 @@ python3 -m src
 - [x] Можно создавать, редактировать, удалять как минимум пять типов ресурсов.
 - [x] Можно получать информацию о доступных конфигурациях ресуров.
 - [x] Выгрузка отчёта по всем потребляемым ресурсам.
-- [ ] Возможность получить сгенерированный терраформ-код для ресурса вместо создания.
+- [x] Возможность получить сгенерированный терраформ-код для ресурса вместо создания.
 - [x] Есть мониторинг ресурса.
 
 ### Нефункциональные

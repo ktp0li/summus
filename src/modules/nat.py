@@ -20,7 +20,7 @@ from huaweicloudsdknat.v2 import UpdateNatGatewayOption, UpdateNatGatewayRequest
 from src.module import Module
 from src.utils import add_exit_button
 from src.globalstate import GlobalState
-from src.modules.terraform import TerraformCreate
+from src.terraform import TerraformCreate
 
 ENDPOINT = 'https://nat.ru-moscow-1.hc.sbercloud.ru'
 
@@ -164,7 +164,7 @@ async def nat_create_projid(message: types.Message, state: FSMContext):
 
     if data['use_terraform'] == True:
         config = TerraformCreate().create_nat_gateway(data['name'], data['description'],
-                    data['spec'], data['router_id'], data['subnet_id'], enterprise_project_id)
+                                                      data['spec'], data['router_id'], data['subnet_id'], enterprise_project_id)
         await message.answer(f'<code>{config}</code>', parse_mode='html')
         await state.set_state(GlobalState.DEFAULT)
         return
